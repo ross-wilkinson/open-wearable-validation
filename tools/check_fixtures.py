@@ -29,7 +29,14 @@ model cares much about, since a null in a fixture diff is conspicuous in a way
 that a plausible-looking float is not, and the TypeScript still asserts those
 points stay finite and in [0, 1].
 
+Tolerances are per-array and mirror the test that consumes each array, rather
+than demanding bit-identical values. Comparing at zero was the third thing this
+job got wrong: across two operating systems, ~1466 values differ in the last
+bit or two, and not one of them could change a test outcome. See
+TOLERANCE_RATIONALE below, or run with --explain.
+
 Run:  python tools/check_fixtures.py
+      python tools/check_fixtures.py --explain
 Exit: 0 if every value matches, 1 otherwise.
 """
 
@@ -39,12 +46,82 @@ import argparse
 import json
 import math
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 COMMITTED = HERE.parent / "src" / "stats" / "__fixtures__"
+
+# Per-array (relative, absolute) tolerances, mirroring the test that consumes
+# each array. See TOLERANCE_RATIONALE below — these are not free parameters, and
+# changing one without changing the corresponding test is always a mistake.
+DEFAULT_TOLERANCE = (1e-12, 0.0)
+
+TOLERANCES: dict[str, tuple[float, float]] = {
+    # special.test.ts
+    "special.logGamma": (1e-14, 0.0),
+    "special.logBeta_exact": (1e-14, 0.0),
+    "special.logBeta": (1e-12, 0.0),
+    "special.incompleteBeta": (1e-13, 0.0),
+    "special.incompleteGammaLower": (1e-12, 1e-300),
+    "special.incompleteGammaUpper": (1e-12, 1e-300),
+    # normal.test.ts
+    "normal.pdf": (1e-14, 0.0),
+    "normal.cdf": (1e-14, 0.0),
+    "normal.cdf_tail": (1e-12, 0.0),
+    "normal.ppf": (1e-13, 0.0),
+    # studentT.test.ts
+    "studentT.pdf": (1e-13, 0.0),
+    "studentT.cdf": (1e-13, 0.0),
+    "studentT.ppf": (1e-10, 0.0),
+    "studentT.ppf_975": (1e-11, 0.0),
+    # halfNormal.test.ts
+    "halfNormal.pdf": (1e-14, 0.0),
+    "halfNormal.cdf": (1e-13, 0.0),
+    "halfNormal.ppf": (1e-13, 0.0),
+    "halfNormal.pdf_at_ppf": (1e-13, 0.0),
+    # poisson.test.ts
+    "poisson.pmf": (1e-12, 0.0),
+    "poisson.cdf": (1e-12, 0.0),
+    # nonCentralT.test.ts. The absolute arm is the important one: AS 243 builds
+    # its answer by repeatedly subtracting O(1) quantities, so SciPy's own result
+    # has a roundoff floor around 1e-16 regardless of how small the true value
+    # is. Below that floor its digits are noise, and noise does not reproduce
+    # across platforms — hence entries like 3.4e-46 against 2.8e-45, a relative
+    # error of 7 and an absolute difference of 2e-45.
+    "nonCentralT.cdf": (1e-9, 1e-13),
+    "nonCentralT.ppf": (1e-7, 0.0),
+    "nonCentralT.reduces_to_central_t": (1e-10, 0.0),
+    # module-level worked examples
+    "modules.loa_precision": (1e-13, 0.0),
+    "modules.cohens_d": (1e-6, 0.0),
+    "modules.precision_curve": (1e-11, 0.0),
+    "modules.loa_parameterised": (1e-11, 0.0),
+    "modules.percentile_parameterised": (1e-11, 0.0),
+    "modules.replicates": (1e-14, 0.0),
+}
+
+TOLERANCE_RATIONALE = """
+Why these are not zero, and why matching the tests is the right rule:
+
+A guard should be exactly as strict as the thing it guards. To silence a failing
+test by editing a fixture, the edit has to move the value by MORE than that
+test's tolerance — otherwise the test was already passing and there was nothing
+to silence. So any edit that could achieve the thing this job exists to prevent
+is caught by comparing at the consuming test's tolerance.
+
+Being stricter than the test does not catch more cheating. It only reports
+differences that cannot change any outcome, and across two operating systems
+there are thousands of those: a one-bit difference in the last place of a double
+is a relative error of ~2e-16, and at tolerance 0 every one of them is a
+failure. The first version of this used 0 and reported 1466 mismatches, none of
+which could have flipped a single assertion.
+
+Every value here is at least ~45x the ulp noise floor and at most equal to its
+test's tolerance, so the window catches real edits and ignores platform noise.
+"""
 
 
 class Mismatch:
@@ -55,6 +132,19 @@ class Mismatch:
         self.want = want
         self.got = got
         self.error = error
+
+
+_ARRAY_KEY = re.compile(r"^([A-Za-z_]\w*\.\w+)")
+
+
+def tolerance_for(path: str, override: float | None) -> tuple[float, float]:
+    """(relative, absolute) tolerance for a leaf, from the array it belongs to."""
+    if override is not None:
+        return (override, 0.0)
+    match = _ARRAY_KEY.match(path)
+    if match and match.group(1) in TOLERANCES:
+        return TOLERANCES[match.group(1)]
+    return DEFAULT_TOLERANCE
 
 
 def relative_error(want: float, got: float) -> float:
@@ -72,7 +162,7 @@ def relative_error(want: float, got: float) -> float:
 def compare(
     want,
     got,
-    tolerance: float,
+    tolerance: float | None,
     path: str,
     out: list[Mismatch],
     declined: list[str],
@@ -129,8 +219,12 @@ def compare(
         return
 
     if isinstance(want, (int, float)) and isinstance(got, (int, float)):
+        rtol, atol = tolerance_for(path, tolerance)
         error = relative_error(float(want), float(got))
-        if error > tolerance:
+        within_absolute = atol > 0 and abs(float(want) - float(got)) <= atol
+        # Either bound suffices — the numpy.allclose convention, and the same
+        # one checkGrid uses on the TypeScript side.
+        if error > rtol and not within_absolute:
             out.append(Mismatch(path, want, got, error))
         return
 
@@ -143,10 +237,16 @@ def main() -> int:
     parser.add_argument(
         "--tolerance",
         type=float,
-        default=0.0,
-        help="maximum permitted relative error (default 0.0, i.e. exact). Raise "
-             "this only with a recorded reason — a loose tolerance here is "
-             "indistinguishable from having no guard at all.",
+        default=None,
+        help="override every per-array tolerance with this single relative "
+             "value. Diagnostic only — the defaults in TOLERANCES mirror the "
+             "test that consumes each array, which is the property that makes "
+             "this guard meaningful. Pass --explain to see the reasoning.",
+    )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="print why the tolerances are what they are, and exit.",
     )
     parser.add_argument(
         "--max-report",
@@ -155,6 +255,15 @@ def main() -> int:
         help="how many mismatches to print before truncating (default 20).",
     )
     args = parser.parse_args()
+
+    if args.explain:
+        print(TOLERANCE_RATIONALE)
+        width = max(len(k) for k in TOLERANCES)
+        for key, (rtol, atol) in TOLERANCES.items():
+            absolute = f"  or abs <= {atol:g}" if atol else ""
+            print(f"  {key:{width}s}  rel <= {rtol:g}{absolute}")
+        print(f"  {'(anything else)':{width}s}  rel <= {DEFAULT_TOLERANCE[0]:g}")
+        return 0
 
     if not COMMITTED.is_dir():
         print(f"error: no committed fixtures at {COMMITTED}", file=sys.stderr)
@@ -228,8 +337,14 @@ def main() -> int:
             "  repo, and there is no golden value on either side to compare. Not fatal.\n"
         )
 
+    scope = (
+        f"the overridden tolerance {args.tolerance:g}"
+        if args.tolerance is not None
+        else "each array's tolerance (matching the test that consumes it)"
+    )
+
     if not mismatches:
-        print(f"All fixture values match at tolerance {args.tolerance:g}.")
+        print(f"All fixture values match at {scope}.")
         return 0
 
     mismatches.sort(key=lambda m: m.error, reverse=True)
@@ -243,7 +358,9 @@ def main() -> int:
         file=sys.stderr,
     )
     for m in mismatches[: args.max_report]:
-        print(f"  {m.path}", file=sys.stderr)
+        rtol, atol = tolerance_for(m.path, args.tolerance)
+        limit = f"rel {rtol:g}" + (f" or abs {atol:g}" if atol else "")
+        print(f"  {m.path}   (allowed: {limit})", file=sys.stderr)
         print(f"    committed: {m.want!r}", file=sys.stderr)
         print(f"    SciPy now: {m.got!r}", file=sys.stderr)
         print(f"    rel error: {m.error:.3e}", file=sys.stderr)

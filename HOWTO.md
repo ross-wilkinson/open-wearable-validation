@@ -721,6 +721,64 @@ committed, so restoring with `git checkout --` reverted the file to the *old
 schema* and the checker was comparing two different formats. Reaching for git as
 an undo only works on things git already knows about.
 
+### The third failure: zero was the wrong tolerance
+
+The shape fix worked — the boundary-point cascade was gone, and 11 points where
+the two platforms disagreed about whether SciPy had an answer were reported and
+correctly treated as non-fatal. What remained was 1,466 differing values, and
+this time they were real.
+
+The worst offender, and the one that explains the rest:
+
+```
+nonCentralT.cdf[1847]   committed 3.394255191436731e-46
+                        SciPy now 2.8215311303430955e-45
+                        rel error 7.31
+```
+
+A relative error of 731%, and an absolute difference of 2×10⁻⁴⁵. Both numbers
+are zero for every purpose this application has. AS 243 builds its answer by
+repeatedly subtracting O(1) quantities, so SciPy's own result carries a roundoff
+floor around 10⁻¹⁶ — below that, its digits are noise, and noise does not
+reproduce across platforms.
+
+The first guess was that all 1,466 were sub-floor values like this one. The data
+said otherwise: only 328 graded points sit below 10⁻¹³. The other ~1,100 were
+ordinary values differing in the last bit or two — a relative error of ~2×10⁻¹⁶,
+which at a tolerance of exactly zero is a failure. Two distinct phenomena, one
+symptom, and the first hypothesis explained less than a quarter of it.
+
+Zero had been chosen deliberately, with an argument that sounded right: *a
+tolerance loose enough to absorb version drift is loose enough to absorb the
+nudged expected value this exists to catch.* The argument is wrong, and the way
+it is wrong is worth keeping.
+
+**A guard should be exactly as strict as the thing it guards.** To silence a
+failing test by editing a fixture, the edit must move the value by *more* than
+that test's tolerance — otherwise the test was already passing and there was
+nothing to silence. So comparing at the consuming test's tolerance catches every
+edit that could achieve the thing this job exists to prevent. Being stricter
+than the test catches no additional cheating; it only reports differences that
+cannot change any outcome. There were 1,466 of those.
+
+So `TOLERANCES` in `check_fixtures.py` now mirrors the test suite array by array
+— `normal.pdf` at 1e-14 because `normal.test.ts` uses 1e-14, `nonCentralT.cdf`
+at 1e-9 relative or 1e-13 absolute because that is exactly what `checkGrid` is
+given there. The table is not a set of free parameters, and changing an entry
+without changing the corresponding test is always a mistake. `--explain` prints
+the reasoning and the whole table.
+
+Verified three ways: replaying the nine exact value pairs from the CI log (all
+now pass, absolute differences ≤4.6×10⁻¹⁷); perturbing a value by one ulp and by
+a tenth of tolerance in every array (all pass); and by ten times tolerance in
+every array (all caught).
+
+There was also a quieter piece of evidence available the whole time, worth
+noticing sooner. The `build` job — which runs all 192 tests **on Linux** against
+these Windows-generated fixtures — passed on every one of these three failing
+commits. The tests were never in doubt. Only the audit of the answer key was,
+and the audit was stricter than the tests it was auditing.
+
 **The lesson.** CI configuration is code, and it was the only code here with no
 test and no second environment to run in. The numerical core was checked against
 SciPy at roughly 7,000 grid points; the job checking it had been run zero times
@@ -779,6 +837,10 @@ the second one was written *after* fixing the first.
   cascades into thousands of false mismatches (M9).
 - `git checkout --` is not an undo for a file whose current form was never
   committed (M9).
+- A guard should be exactly as strict as the thing it guards — stricter catches
+  no more cheating and buries the signal in platform noise (M9).
+- Two phenomena can share one symptom; the first hypothesis explained 328 of
+  1,466 cases, and the count is what exposed it (M9).
 
 **A meta-lesson.** The hardest bugs here — the factor-of-two quantile, the
 invisible chart lines, the `betaln` disagreement — were all resolved by looking
