@@ -881,6 +881,45 @@ user rather than as its author.
 
 ---
 
+## Milestone 11: one task, not five modules
+
+Stage 2 of the reframing. Sizing a study, planning recruitment, and building a
+timeline are one job, and the modules treated them as five unrelated
+calculators — the user computed 149, walked to the next page, and retyped it,
+with every retype a chance to carry the wrong number forward.
+
+A shared `Study` now holds only what more than one module needs: n, confidence,
+and an optional measurement SD for making SD-relative margins concrete.
+
+The design decision worth recording is what it deliberately does *not* do.
+Automatically syncing every module to a shared n is less code and worse: a user
+experiments with a number on one page, and a different page silently changes,
+with nothing on screen explaining why. Instead modules **seed** from the plan on
+mount and write back only on request. Routing unmounts a page on navigation, so
+mount is exactly the right moment to pick the plan up, and after that the
+control belongs to the user. When a page and the plan disagree the bar says so
+and offers the choice, rather than resolving it silently in either direction.
+
+`parseStudy` validates field by field rather than casting. The value comes from
+localStorage: user-writable, surviving across deploys, possibly written by an
+older build. A cast would let `n: "150"` reach arithmetic as string
+concatenation, or `n: -3` reach a sample-size field.
+
+Two testing notes. `useStudy` throws outside its provider, which broke every
+existing page test at once — correct behaviour, since a page silently reading
+defaults and dropping saves is the worse failure, but it meant a
+`renderWithStudy` helper. And the first version of that helper cleared storage
+before rendering, which defeated `seedStudy`: the seed necessarily runs first,
+so the render wiped the plan the test had just staged. Clearing belongs in
+global setup, once per test, not at render time.
+
+Verified in the browser as an actual journey rather than as separate pages:
+no bar before anything is carried, carry 149 on the agreement page, find it
+seeded on recruitment, present on precision and timeline, then cleared — no
+console errors at any step.
+
+---
+
 ## Concepts index
 
 **Numerical methods**

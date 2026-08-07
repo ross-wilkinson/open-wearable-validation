@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithStudy } from '../../test/renderWithStudy.tsx';
 import userEvent from '@testing-library/user-event';
 import TimelinePage from './TimelinePage.tsx';
 
@@ -19,7 +20,7 @@ const phasesSection = () => within(screen.getByRole('region', { name: /^phases$/
 
 describe('TimelinePage', () => {
   it('renders the default phases and a total duration', () => {
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
 
     expect(
       screen.getByRole('heading', { name: /how long will it take\?/i }),
@@ -32,7 +33,7 @@ describe('TimelinePage', () => {
   });
 
   it('orders the reported percentiles', () => {
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
     const values = totals()
       .getAllByText(/^\d+ d$/)
       .map((node) => Number(node.textContent!.replace(' d', '')));
@@ -43,7 +44,7 @@ describe('TimelinePage', () => {
 
   it('shows the Poisson variance constraint when that distribution is chosen', async () => {
     const user = userEvent.setup();
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
 
     const selects = phasesSection().getAllByLabelText(/distribution/i);
     await user.selectOptions(selects[0]!, 'poisson');
@@ -59,7 +60,7 @@ describe('TimelinePage', () => {
 
   it('swaps to three-point inputs for PERT', async () => {
     const user = userEvent.setup();
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
 
     // One default phase already uses PERT, so count rather than assert absence.
     const before = phasesSection().getAllByLabelText(/optimistic/i).length;
@@ -74,7 +75,7 @@ describe('TimelinePage', () => {
 
   it('adds and removes phases', async () => {
     const user = userEvent.setup();
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
 
     await user.click(screen.getByRole('button', { name: /add phase/i }));
     expect(screen.getByDisplayValue('New phase')).toBeInTheDocument();
@@ -85,11 +86,11 @@ describe('TimelinePage', () => {
 
   it('is reproducible for a seed and changes when the seed changes', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<TimelinePage />);
+    const { unmount } = renderWithStudy(<TimelinePage />);
     const first = totals().getAllByText(/^\d+ d$/)[0]!.textContent;
     unmount();
 
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
     expect(totals().getAllByText(/^\d+ d$/)[0]!.textContent).toBe(first);
 
     await user.clear(screen.getByLabelText(/random seed/i));
@@ -103,7 +104,7 @@ describe('TimelinePage', () => {
   });
 
   it('reports a P95 later than the naive sum of expected durations', () => {
-    render(<TimelinePage />);
+    renderWithStudy(<TimelinePage />);
     // The practical lesson of the module, asserted through the UI.
     expect(
       screen.getByText(/means finishing on time roughly half the time/i),

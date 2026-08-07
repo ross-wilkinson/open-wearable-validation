@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BookOpen } from 'lucide-react';
+import StudyBar from '../../app/study/StudyBar.tsx';
 
 interface ModulePageProps {
   /** The user's question, used as the page heading. */
@@ -23,6 +24,11 @@ interface ModulePageProps {
    * use it, so it belongs on the page but not in front of the answer.
    */
   methodNotes?: ReactNode;
+  /**
+   * The sample size this page is working with, if any. Passed to the study bar
+   * so it can point out when the page and the saved plan disagree.
+   */
+  currentN?: number | null;
   /** Controls column. Sticky on wide screens, stacked above on narrow ones. */
   controls: ReactNode;
   children: ReactNode;
@@ -42,11 +48,14 @@ export default function ModulePage({
   intro,
   assumption,
   methodNotes,
+  currentN,
   controls,
   children,
 }: ModulePageProps) {
   return (
     <div className="flex flex-col gap-8">
+      <StudyBar currentN={currentN} />
+
       <header className="max-w-3xl">
         {method && (
           <p className="text-sm font-medium text-series-1">{method}</p>

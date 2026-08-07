@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithStudy } from '../../test/renderWithStudy.tsx';
 import userEvent from '@testing-library/user-event';
 import PrecisionPage from './PrecisionPage.tsx';
 import { biasMargin, percentileMargin } from './precisionModel.ts';
@@ -18,7 +19,7 @@ const neededTable = () =>
 
 describe('PrecisionPage', () => {
   it('renders the default series with their computed values', () => {
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     expect(
       screen.getByRole('heading', { name: /how precise will my study be\?/i }),
@@ -36,7 +37,7 @@ describe('PrecisionPage', () => {
 
   it('recomputes when the inspection point changes', async () => {
     const user = userEvent.setup();
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     const field = screen.getByLabelText(/inspect at n/i);
     await user.clear(field);
@@ -50,7 +51,7 @@ describe('PrecisionPage', () => {
 
   it('widens every margin when the confidence level rises', async () => {
     const user = userEvent.setup();
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     expect(
       statCards().getByText(`±${biasMargin(64, 0.95).toFixed(3)}`),
@@ -65,7 +66,7 @@ describe('PrecisionPage', () => {
 
   it('adds and removes percentile series', async () => {
     const user = userEvent.setup();
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     expect(statCards().queryByText('68th percentile')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'P68' }));
@@ -76,7 +77,7 @@ describe('PrecisionPage', () => {
   });
 
   it('reports a larger required n for an upper percentile than for the bias', () => {
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     // The module's actual argument, asserted through the UI: sizing on the bias
     // understates what the other estimands need.
@@ -94,7 +95,7 @@ describe('PrecisionPage', () => {
 
   it('renders a table view of every plotted value', async () => {
     const user = userEvent.setup();
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     // The table is the accessible equivalent of the chart, and the documented
     // relief for series colours below 3:1 contrast on the light surface.
@@ -112,7 +113,7 @@ describe('PrecisionPage', () => {
 
   it('says so when a target margin is unreachable in range', async () => {
     const user = userEvent.setup();
-    render(<PrecisionPage />);
+    renderWithStudy(<PrecisionPage />);
 
     const target = screen.getByLabelText(/target margin/i);
     await user.clear(target);

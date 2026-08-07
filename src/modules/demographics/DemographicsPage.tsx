@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import NextSteps from '../../app/study/NextSteps.tsx';
+import { useStudy } from '../../app/study/StudyContext.tsx';
+
 import NumberField from '../../components/common/NumberField.tsx';
 import {
   SEGMENT_PRESETS,
@@ -9,7 +12,8 @@ import {
 } from './demographicsModel.ts';
 
 export default function DemographicsPage() {
-  const [sampleSize, setSampleSize] = useState(65);
+  const { study } = useStudy();
+  const [sampleSize, setSampleSize] = useState(() => study.n ?? 65);
   const [segments, setSegments] = useState(2);
   const [minPercent, setMinPercent] = useState(40);
   const [labels, setLabels] = useState<string[]>(['Female', 'Male']);
@@ -49,6 +53,7 @@ export default function DemographicsPage() {
   return (
     <ModulePage
       title="Who do I need to recruit?"
+      currentN={sampleSize}
       method="Demographic segment planner"
       intro={
         <>
@@ -287,6 +292,22 @@ export default function DemographicsPage() {
           </section>
         </>
       )}
+      <NextSteps
+        offer={{ n: sampleSize, source: 'recruitment plan' }}
+        steps={[
+          {
+            to: '/timeline',
+            title: 'How long will it take?',
+            description:
+              'Recruiting the rarest segment is usually what sets the schedule.',
+          },
+          {
+            to: '/precision',
+            title: 'How precise will my study be?',
+            description: 'Check this total still delivers the precision you need.',
+          },
+        ]}
+      />
     </ModulePage>
   );
 }

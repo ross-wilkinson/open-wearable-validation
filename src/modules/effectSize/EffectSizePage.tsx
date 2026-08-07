@@ -12,6 +12,9 @@ import {
 } from 'recharts';
 import { AlertTriangle } from 'lucide-react';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import NextSteps from '../../app/study/NextSteps.tsx';
+import { useStudy } from '../../app/study/StudyContext.tsx';
+
 import MethodsText from '../../components/common/MethodsText.tsx';
 import IntervalComparison from './IntervalComparison.tsx';
 import { CUMMING_2001, STEIGER_2004 } from '../../content/citations.ts';
@@ -39,8 +42,9 @@ const CONFIDENCE_OPTIONS = [
 
 export default function EffectSizePage() {
   const [d, setD] = useState(0.5);
-  const [n, setN] = useState(44);
-  const [confidence, setConfidence] = useState('0.95');
+  const { study } = useStudy();
+  const [n, setN] = useState(() => study.n ?? 44);
+  const [confidence, setConfidence] = useState(() => String(study.confidence));
   const [design, setDesign] = useState<Design>('one-sample');
 
   const result = useMemo(
@@ -68,6 +72,7 @@ export default function EffectSizePage() {
   return (
     <ModulePage
       title="How big is the effect, and how sure am I?"
+      currentN={n}
       method="Cohen's d confidence intervals from the non-central t"
       intro={
         <>
@@ -332,6 +337,23 @@ export default function EffectSizePage() {
           />
         </>
       )}
+
+      <NextSteps
+        steps={[
+          {
+            to: '/agreement',
+            title: 'How many participants do I need?',
+            description:
+              'Validation studies are usually sized on agreement rather than on an effect size.',
+          },
+          {
+            to: '/explainers/rmse-mae',
+            title: 'Misled by RMSE and MAE',
+            description:
+              'Why a single summary number can hide what your users actually experience.',
+          },
+        ]}
+      />
     </ModulePage>
   );
 }

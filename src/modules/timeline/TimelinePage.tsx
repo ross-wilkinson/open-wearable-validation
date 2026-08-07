@@ -11,6 +11,9 @@ import {
 } from 'recharts';
 import { Plus, Trash2 } from 'lucide-react';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import NextSteps from '../../app/study/NextSteps.tsx';
+import { useStudy } from '../../app/study/StudyContext.tsx';
+
 import NumberField from '../../components/common/NumberField.tsx';
 import SelectField from '../../components/common/SelectField.tsx';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
@@ -39,6 +42,7 @@ function days(value: number): string {
 }
 
 export default function TimelinePage() {
+  const { study } = useStudy();
   const [phases, setPhases] = useState<Phase[]>(DEFAULT_PHASES);
   const [iterations, setIterations] = useState('50000');
   const [seed, setSeed] = useState(7);
@@ -76,6 +80,7 @@ export default function TimelinePage() {
   return (
     <ModulePage
       title="How long will it take?"
+      currentN={study.n}
       method="Study duration Monte Carlo"
       intro={
         <>
@@ -401,6 +406,22 @@ export default function TimelinePage() {
           })}
         </div>
       </section>
+      <NextSteps
+        steps={[
+          {
+            to: '/demographics',
+            title: 'Who do I need to recruit?',
+            description:
+              'Check the recruitment target per segment is reachable in the time above.',
+          },
+          {
+            to: '/precision',
+            title: 'How precise will my study be?',
+            description:
+              'Confirm the sample size this timeline assumes actually delivers the precision you need.',
+          },
+        ]}
+      />
     </ModulePage>
   );
 }

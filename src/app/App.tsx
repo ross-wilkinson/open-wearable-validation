@@ -1,4 +1,5 @@
 import { HashRouter, Route, Routes } from 'react-router-dom';
+import { StudyProvider } from './study/StudyContext.tsx';
 import NavBar from '../components/layout/NavBar.tsx';
 import Footer from '../components/layout/Footer.tsx';
 import HomePage from '../pages/HomePage.tsx';
@@ -24,25 +25,30 @@ import NotFoundPage from '../pages/NotFoundPage.tsx';
 export default function App() {
   return (
     <HashRouter>
-      <div className="flex min-h-screen flex-col">
-        <NavBar />
-        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/precision" element={<PrecisionPage />} />
-            <Route path="/agreement" element={<AgreementPage />} />
-            <Route path="/demographics" element={<DemographicsPage />} />
-            <Route path="/timeline" element={<TimelinePage />} />
-            <Route path="/effect-size" element={<EffectSizePage />} />
-            <Route path="/explainers" element={<ExplainersPage />} />
-            <Route path="/explainers/rmse-mae" element={<RmseExplainerPage />} />
-            <Route path="/explainers/agreement-vs-icc" element={<IccExplainerPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+      <StudyProvider>
+        <div className="flex min-h-screen flex-col">
+          <NavBar />
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/precision" element={<PrecisionPage />} />
+              <Route path="/agreement" element={<AgreementPage />} />
+              <Route path="/demographics" element={<DemographicsPage />} />
+              <Route path="/timeline" element={<TimelinePage />} />
+              <Route path="/effect-size" element={<EffectSizePage />} />
+              <Route path="/explainers" element={<ExplainersPage />} />
+              <Route path="/explainers/rmse-mae" element={<RmseExplainerPage />} />
+              <Route
+                path="/explainers/agreement-vs-icc"
+                element={<IccExplainerPage />}
+              />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </StudyProvider>
     </HashRouter>
   );
 }

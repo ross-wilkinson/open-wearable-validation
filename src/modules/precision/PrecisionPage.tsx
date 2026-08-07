@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import NextSteps from '../../app/study/NextSteps.tsx';
+import { useStudy } from '../../app/study/StudyContext.tsx';
+
 import NumberField from '../../components/common/NumberField.tsx';
 import SelectField from '../../components/common/SelectField.tsx';
 import ChartLegend from '../../components/common/ChartLegend.tsx';
@@ -30,11 +33,13 @@ const LOA_OPTIONS = [
 const PERCENTILE_CHOICES = [0.5, 0.68, 0.9, 0.95] as const;
 
 export default function PrecisionPage() {
-  const [confidence, setConfidence] = useState('0.95');
+  const { study } = useStudy();
+  const [confidence, setConfidence] = useState(() => String(study.confidence));
   const [loaMultiplier, setLoaMultiplier] = useState('1.959963984540054');
   const [percentiles, setPercentiles] = useState<number[]>([0.5, 0.9]);
   const [maxN, setMaxN] = useState(200);
-  const [selectedN, setSelectedN] = useState(64);
+  // Seeded from the plan on mount; the control belongs to the user after that.
+  const [selectedN, setSelectedN] = useState(() => study.n ?? 64);
   const [target, setTarget] = useState(0.25);
 
   const options = useMemo(
@@ -95,6 +100,7 @@ export default function PrecisionPage() {
   return (
     <ModulePage
       title="How precise will my study be?"
+      currentN={selectedN}
       method="Bias, limits of agreement, and error percentiles against n"
       intro={
         <>
@@ -346,6 +352,23 @@ export default function PrecisionPage() {
           and the curve says so.
         </p>
       </section>
+      <NextSteps
+        offer={{ n: selectedN, source: 'precision at this n' }}
+        confidence={Number(confidence)}
+        steps={[
+          {
+            to: '/demographics',
+            title: 'Who do I need to recruit?',
+            description:
+              'Turn this sample size into a recruitment target per segment.',
+          },
+          {
+            to: '/timeline',
+            title: 'How long will it take?',
+            description: 'Simulate the phases and get a completion date with a range.',
+          },
+        ]}
+      />
     </ModulePage>
   );
 }

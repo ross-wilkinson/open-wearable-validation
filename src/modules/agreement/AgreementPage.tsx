@@ -15,6 +15,8 @@ import NumberField from '../../components/common/NumberField.tsx';
 import SelectField from '../../components/common/SelectField.tsx';
 import ChartLegend from '../../components/common/ChartLegend.tsx';
 import { BLAND_ALTMAN_1986, CHOW_2007 } from '../../content/citations.ts';
+import NextSteps from '../../app/study/NextSteps.tsx';
+import { useStudy } from '../../app/study/StudyContext.tsx';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
 import {
   loaPrecisionCurve,
@@ -34,8 +36,12 @@ const LEGEND = [
 ];
 
 export default function AgreementPage() {
+  const { study } = useStudy();
   const [threshold, setThreshold] = useState(15 / 54);
-  const [confidence, setConfidence] = useState('0.95');
+  // Seeded from the plan on mount. Routing unmounts a page on navigation, so
+  // mounting is exactly the moment the plan should be picked up — and after
+  // that the control is the user's, not the plan's.
+  const [confidence, setConfidence] = useState(() => String(study.confidence));
 
   const [alpha, setAlpha] = useState(0.05);
   const [power, setPower] = useState(0.8);
@@ -370,6 +376,29 @@ export default function AgreementPage() {
           }
         />
       )}
+
+      <NextSteps
+        offer={
+          result.n === null
+            ? undefined
+            : { n: result.n, source: 'sample size for agreement' }
+        }
+        confidence={Number(confidence)}
+        steps={[
+          {
+            to: '/demographics',
+            title: 'Who do I need to recruit?',
+            description:
+              'Split this total into a target per sex, age band, or skin tone, and check it is reachable.',
+          },
+          {
+            to: '/precision',
+            title: 'How precise will my study be?',
+            description:
+              'See what this sample size buys you for bias, limits of agreement, and error percentiles.',
+          },
+        ]}
+      />
     </ModulePage>
   );
 }
