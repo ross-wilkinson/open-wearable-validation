@@ -54,7 +54,7 @@ export const MODULE_ROUTES: ModuleRoute[] = [
     title: 'Study timeline simulator',
     blurb:
       'Monte Carlo over each study phase, with a distribution choice per phase rather than one forced shape.',
-    status: 'planned',
+    status: 'ready',
     inNav: true,
   },
   {
