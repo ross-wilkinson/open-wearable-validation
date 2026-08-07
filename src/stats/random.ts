@@ -214,3 +214,21 @@ export function standardDeviation(values: readonly number[]): number {
   for (const value of values) total += (value - m) ** 2;
   return Math.sqrt(total / (values.length - 1));
 }
+
+/**
+ * Student t with `df` degrees of freedom.
+ *
+ * Built from its definition, t = Z / sqrt(X/df) with X ~ chi-square(df), and
+ * chi-square(df) is Gamma(df/2, 2). Non-integer df is fine and is exactly what
+ * the RMSE explainer needs — the error distributions it models sit around
+ * df = 1.3.
+ *
+ * Note what that implies: the variance of a t distribution is df/(df-2), which
+ * is undefined for df <= 2. Sampling still works; it is the *summary
+ * statistics* that stop meaning anything, which is the explainer's whole point.
+ */
+export function sampleStudentT(rng: Rng, df: number): number {
+  if (!(df > 0)) return Number.NaN;
+  const chiSquare = sampleGamma(rng, df / 2, 2);
+  return sampleNormal(rng) / Math.sqrt(chiSquare / df);
+}

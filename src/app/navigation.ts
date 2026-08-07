@@ -75,16 +75,16 @@ export const EXPLAINER_ROUTES: ModuleRoute[] = [
     title: 'Misled by RMSE and MAE',
     blurb:
       'Device errors are heavy-tailed. Two distributions with identical RMSE can put wildly different proportions of users inside it.',
-    status: 'planned',
+    status: 'ready',
     inNav: false,
   },
   {
     path: '/explainers/agreement-vs-icc',
     label: 'Agreement vs ICC',
-    title: 'Agreement vs ICC',
+    title: 'Agreement is not ICC',
     blurb:
       'Two datasets with identical paired differences, ICC 0.20 and 0.99. ICC is hostage to between-subject variance.',
-    status: 'planned',
+    status: 'ready',
     inNav: false,
   },
 ];

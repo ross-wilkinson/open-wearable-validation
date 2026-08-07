@@ -8,6 +8,14 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+# Two overlapping pushes to main must not race each other mid-upload.
+# `cancel-in-progress: false` queues the second rather than aborting the first.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,6 +31,24 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # A pull request still runs the full build/lint/test above to validate it; only
+  # a push to main actually publishes. Without this guard every PR from a fork
+  # would try to deploy — wrong, and it would fail anyway, since forks do not
+  # carry the Pages deployment permissions.
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build, fixtures]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   # The golden fixtures in src/stats/__fixtures__ are committed, so CI does not
   # need SciPy to run the test suite. This job re-derives them from SciPy and
@@ -40,3 +66,14 @@ jobs:
       - run: python tools/generate_fixtures.py
       - name: Fail if regenerated fixtures differ from the committed ones
         run: git diff --exit-code -- src/stats/__fixtures__
+
+# One-time manual step this workflow cannot do for you:
+#   repo Settings -> Pages -> Source = "GitHub Actions".
+# Without it the artifact upload succeeds and nothing serves the result.
+#
+# The repository must be named `validation-study-designer` to match `base` in
+# vite.config.ts, or that one line needs changing to match the repo name —
+# otherwise every asset 404s on Pages while working fine on localhost.
+#
+# No 404.html copy step is needed: the app uses HashRouter, so a deep link is
+# never sent to the server as a real path in the first place.
