@@ -63,7 +63,7 @@ export const MODULE_ROUTES: ModuleRoute[] = [
     title: 'Effect size confidence intervals',
     blurb:
       "Cohen's d intervals from the non-central t distribution, not a normal approximation.",
-    status: 'planned',
+    status: 'ready',
     inNav: true,
   },
 ];

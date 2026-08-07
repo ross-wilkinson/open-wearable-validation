@@ -6,6 +6,7 @@ import PrecisionPage from '../modules/precision/PrecisionPage.tsx';
 import AgreementPage from '../modules/agreement/AgreementPage.tsx';
 import DemographicsPage from '../modules/demographics/DemographicsPage.tsx';
 import TimelinePage from '../modules/timeline/TimelinePage.tsx';
+import EffectSizePage from '../modules/effectSize/EffectSizePage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 
 /**
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/agreement" element={<AgreementPage />} />
             <Route path="/demographics" element={<DemographicsPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
+            <Route path="/effect-size" element={<EffectSizePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
