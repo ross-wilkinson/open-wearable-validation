@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # The golden fixtures in src/stats/__fixtures__ are committed, so CI does not
+  # need SciPy to run the test suite. This job re-derives them from SciPy and
+  # fails if the committed copies drifted — which is the only way a silently
+  # edited fixture ("the test was failing so I nudged the expected value") gets
+  # caught. It is the whole safety net for the numerical core.
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install "numpy>=2" "scipy>=1.14"
+      - run: python tools/generate_fixtures.py
+      - name: Fail if regenerated fixtures differ from the committed ones
+        run: git diff --exit-code -- src/stats/__fixtures__
