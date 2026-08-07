@@ -82,8 +82,8 @@ export default function RmseExplainerPage() {
           className="mt-2 w-full accent-[var(--color-series-1)]"
         />
         <p className="mt-1 text-xs text-ink-muted">
-          Lower means heavier tails. The source notebook used 1.3, chosen because it was
-          the closest fit to the error distributions of real health algorithms.
+          Lower means heavier tails. 1.3 is a realistic starting point — it is close to the
+          error distributions observed in real health algorithms.
         </p>
 
         {result.varianceUndefined && (

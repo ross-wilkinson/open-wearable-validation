@@ -94,17 +94,54 @@ export default function PrecisionPage() {
 
   return (
     <ModulePage
-      title="Precision vs sample size"
+      title="How precise will my study be?"
+      method="Bias, limits of agreement, and error percentiles against n"
       intro={
         <>
           <p>
-            Every validation report quotes a bias, limits of agreement, and error
-            percentiles. They do not converge at the same rate — and studies get sized
-            on the bias, which is the easiest of the four to pin down.
+            If your sample size is already fixed — by budget, by a cohort you have, or
+            by a number someone else chose — this shows what that n actually buys you,
+            before you commit to it.
           </p>
           <p>
-            Margins are in units of the measurement SD, so this chart applies whatever
-            you are measuring. A margin of 0.25 means a quarter of a standard deviation.
+            A validation report quotes bias, limits of agreement, and error
+            percentiles, and those do not converge at the same rate. Studies are
+            routinely sized on the bias, which is the <em>easiest</em> of them to pin
+            down; the limits of agreement and the 95th percentile need substantially
+            more people to reach the same precision.
+          </p>
+          <p>
+            Margins are in units of the measurement SD, so this applies whatever you
+            are measuring: a margin of 0.25 means a quarter of a standard deviation.
+          </p>
+        </>
+      }
+      assumption={
+        <>
+          the measurement differences are approximately normal and independent across
+          participants. Repeated measurements on the same person are not independent —
+          if your design has those, the effective sample size is smaller than the
+          number of recordings.
+        </>
+      }
+      methodNotes={
+        <>
+          <p>
+            The bias margin is the standard error of a mean,{' '}
+            <code className="tabular text-ink">t(1−α/2, n−1) / √n</code>. Each limit of
+            agreement carries the extra uncertainty of the SD it is built from:{' '}
+            <code className="tabular text-ink">
+              t(1−α/2, n−1) × √(1/n + k²/(2(n−1)))
+            </code>
+            , which is why the limits converge more slowly than the bias.
+          </p>
+          <p>
+            Percentile margins use the asymptotic variance of a sample quantile,{' '}
+            <code className="tabular text-ink">p(1−p) / (n · f(x_p)²)</code>, with the
+            density evaluated at the quantile of the half-normal — the distribution of
+            absolute error when the error itself is normal. The 95th percentile is the
+            hardest of all to pin down, because the density is smallest in the tail and
+            it sits in the denominator.
           </p>
         </>
       }

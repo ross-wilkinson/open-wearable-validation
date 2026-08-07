@@ -10,9 +10,11 @@ import {
   YAxis,
 } from 'recharts';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import MethodsText from '../../components/common/MethodsText.tsx';
 import NumberField from '../../components/common/NumberField.tsx';
 import SelectField from '../../components/common/SelectField.tsx';
 import ChartLegend from '../../components/common/ChartLegend.tsx';
+import { BLAND_ALTMAN_1986, CHOW_2007 } from '../../content/citations.ts';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
 import {
   loaPrecisionCurve,
@@ -28,7 +30,7 @@ const CONFIDENCE_OPTIONS = [
 
 const LEGEND = [
   { key: 'exact', label: 'Exact (Bland–Altman)', colorSlot: 1 },
-  { key: 'approximate', label: 'Notebook approximation 1.96√(3/n)', colorSlot: 2 },
+  { key: 'approximate', label: 'Common approximation 1.96√(3/n)', colorSlot: 2 },
 ];
 
 export default function AgreementPage() {
@@ -55,18 +57,55 @@ export default function AgreementPage() {
 
   return (
     <ModulePage
-      title="Sample size for agreement"
+      title="How many participants do I need?"
+      method="Sample size for a limits-of-agreement threshold"
       intro={
         <>
           <p>
-            Set the accuracy you need as a fraction of the measurement SD, and read off
-            the number of subjects that pins your limits of agreement down that tightly.
+            Decide how tightly your limits of agreement have to be pinned down, and
+            this gives you the number of participants that achieves it. That number is
+            the one to put in a protocol, a budget, or a recruitment plan.
           </p>
           <p>
-            Both curves are plotted: the exact Bland–Altman expression, and the
-            <code className="tabular mx-1 text-ink">1.96√(3/n)</code>
-            approximation the source notebook used. They cross at n = 117 — below that,
-            the approximation asks for too few subjects.
+            The threshold is set as a fraction of the standard deviation of the paired
+            differences, so it travels with your device rather than with the units you
+            happen to measure in.
+          </p>
+        </>
+      }
+      assumption={
+        <>
+          the paired differences are roughly normally distributed and free of
+          proportional bias. If your errors grow with the magnitude of the
+          measurement, transform first or the limits will be too wide at one end and
+          too narrow at the other.
+        </>
+      }
+      methodNotes={
+        <>
+          <p>
+            The exact standard error of a limit of agreement is{' '}
+            <code className="tabular text-ink">
+              t(1−α/2, n−1) × √(1/n + k²/(2(n−1)))
+            </code>
+            , where <em>k</em> is the interval multiplier (1.96 for 95% limits). Its{' '}
+            <code className="tabular text-ink">n−1</code> denominator is the reason
+            small studies are penalised more than a naive count suggests.
+          </p>
+          <p>
+            A widely used shortcut replaces this with{' '}
+            <code className="tabular text-ink">1.96√(3/n)</code>, dropping the t
+            correction and rounding the variance term up to 3. Both are plotted above.
+            They cross at <strong className="text-ink">n = 117</strong>: below that the
+            shortcut asks for too few participants, above it too many. If a colleague&rsquo;s
+            spreadsheet disagrees with this page by a handful of subjects, that is
+            almost always why.
+          </p>
+          <p>
+            The equivalence-test sample size below answers a different question and
+            uses Chow, Wang &amp; Shao (2007) formula 3.1.9. It returns no answer when
+            the true difference lies at or outside the equivalence margin, because no
+            sample size can demonstrate equivalence in that case.
           </p>
         </>
       }
@@ -80,7 +119,7 @@ export default function AgreementPage() {
             max={5}
             step={0.01}
             suffix="SD"
-            hint="How tightly the limits of agreement must be pinned down. Default is the notebook's own worked case, 15/54."
+            hint="How tightly each limit of agreement must be pinned down, as a fraction of the SD of the differences. Default is 15/54 — a 15-unit target on a device with an SD of 54."
           />
           <SelectField
             label="Confidence level"
@@ -91,42 +130,51 @@ export default function AgreementPage() {
         </>
       }
     >
+      {/* One answer, at full weight. An earlier version showed the exact result
+          and a looser approximation side by side at equal size, which handed the
+          user a decision they came here to have made for them. The comparison is
+          still available, in Method and sources, where it answers the question a
+          reader actually has: "why does this differ from the number I was given?" */}
       <section aria-labelledby="required-n">
         <h2
           id="required-n"
           className="text-sm font-semibold uppercase tracking-wide text-ink-muted"
         >
-          Subjects required
+          Participants required
         </h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-hairline bg-surface p-5">
-            <p className="text-xs font-medium text-ink-muted">Exact (Bland–Altman)</p>
-            <p className="mt-2 text-3xl font-semibold">
-              {result.n ?? '—'}
-              <span className="ml-1.5 text-sm font-normal text-ink-muted">
-                subjects
-              </span>
-            </p>
-          </div>
-          <div className="rounded-xl border border-hairline bg-surface p-5">
-            <p className="text-xs font-medium text-ink-muted">Notebook approximation</p>
-            <p className="mt-2 text-3xl font-semibold text-ink-secondary">
-              {result.approximateN ?? '—'}
-              <span className="ml-1.5 text-sm font-normal text-ink-muted">
-                subjects
-              </span>
-            </p>
-          </div>
-        </div>
-        {result.n !== null && result.approximateN !== null && (
-          <p className="mt-2 text-xs leading-relaxed text-ink-muted">
-            {result.approximateN < result.n
-              ? `The approximation is ${result.n - result.approximateN} subject(s) short here — it drops the t correction, which matters most at small n.`
-              : result.approximateN > result.n
-                ? `The approximation asks for ${result.approximateN - result.n} more subject(s) than needed here — past n = 117 its inflated √3 constant dominates.`
-                : 'Both forms agree at this threshold.'}
+        <div className="mt-3 rounded-xl border border-hairline bg-surface p-6">
+          <p className="text-5xl font-semibold tracking-tight">
+            {result.n ?? '—'}
+            <span className="ml-2 text-base font-normal text-ink-muted">
+              participants
+            </span>
           </p>
-        )}
+          <p className="mt-3 max-w-xl leading-relaxed text-ink-secondary">
+            {result.n === null ? (
+              'No sample size in the plotted range reaches this threshold. Loosen it, or lower the confidence level.'
+            ) : (
+              <>
+                pins each limit of agreement to within{' '}
+                <strong className="tabular text-ink">
+                  ±{threshold.toFixed(3)}
+                </strong>{' '}
+                of the SD of the paired differences, at{' '}
+                {(Number(confidence) * 100).toFixed(0)}% confidence.
+              </>
+            )}
+          </p>
+          {result.n !== null && result.approximateN !== null && (
+            <p className="mt-3 border-t border-hairline pt-3 text-xs leading-relaxed text-ink-muted">
+              {result.approximateN === result.n
+                ? 'The common 1.96√(3/n) shortcut agrees with the exact form at this threshold.'
+                : `The common 1.96√(3/n) shortcut would say ${result.approximateN} — ${
+                    result.approximateN < result.n
+                      ? `${result.n - result.approximateN} too few`
+                      : `${result.approximateN - result.n} more than needed`
+                  }. See Method and sources.`}
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="rounded-xl border border-hairline bg-surface p-5">
@@ -212,7 +260,7 @@ export default function AgreementPage() {
               <Line
                 type="monotone"
                 dataKey="approximate"
-                name="Notebook approximation"
+                name="Common approximation"
                 stroke={seriesColor(2)}
                 strokeWidth={2}
                 strokeDasharray="5 3"
@@ -298,6 +346,30 @@ export default function AgreementPage() {
           </div>
         </div>
       </section>
+
+      {result.n !== null && (
+        <MethodsText
+          text={
+            `Sample size was determined for agreement rather than for hypothesis testing. ` +
+            `A sample of ${result.n} participants constrains each ${(Number(confidence) * 100).toFixed(0)}% ` +
+            `limit of agreement to within ${threshold.toFixed(3)} standard deviations of the ` +
+            `paired differences, using the exact expression for the standard error of a ` +
+            `limit of agreement, t(1-a/2, n-1) * sqrt(1/n + k^2/(2(n-1))) with k = 1.96. ` +
+            (equivalenceN === null
+              ? ''
+              : `A separate equivalence calculation, with alpha = ${alpha}, power = ${power}, ` +
+                `an equivalence margin of ${delta} and an assumed true difference of ${epsilon}, ` +
+                `requires ${equivalenceN} participants. `) +
+            `The analysis assumes the paired differences are approximately normally ` +
+            `distributed and free of proportional bias.`
+          }
+          citations={
+            equivalenceN === null
+              ? [BLAND_ALTMAN_1986]
+              : [BLAND_ALTMAN_1986, CHOW_2007]
+          }
+        />
+      )}
     </ModulePage>
   );
 }

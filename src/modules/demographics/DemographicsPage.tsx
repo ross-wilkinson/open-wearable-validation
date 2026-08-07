@@ -48,22 +48,34 @@ export default function DemographicsPage() {
 
   return (
     <ModulePage
-      title="Demographic segment planner"
+      title="Who do I need to recruit?"
+      method="Demographic segment planner"
       intro={
         <>
           <p>
-            Recruiting is easiest in the commonest segment and hardest in the rarest.
-            Set only a floor and the easy segments fill first, the total target is met,
-            and the rare segment is still short — with no budget left to fix it.
+            A total sample size is not a recruitment plan. This turns your n into a
+            target per segment — sex, age band, or skin tone — and tells you before you
+            start whether that target is reachable at all.
           </p>
           <p className="flex gap-2 rounded-lg border border-hairline bg-surface p-3 text-sm">
             <Info size={16} aria-hidden className="mt-0.5 shrink-0 text-series-1" />
             <span>
-              <strong className="font-semibold">The point of this module:</strong> you
-              have to cap the <em>maximum</em> per segment, not just set a minimum. The
-              cap is what reserves room for the segment you will struggle to fill.
+              <strong className="font-semibold">Cap the maximum, not just the
+              minimum.</strong>{' '}
+              Recruiting is easiest in the commonest segment and hardest in the rarest.
+              Set only a floor and the easy segments fill first, the total is met, and
+              the rare segment is still short — with no budget left to fix it. The cap
+              is what reserves room for the segment you will struggle to fill.
             </span>
           </p>
+        </>
+      }
+      assumption={
+        <>
+          every participant falls into exactly one segment, and segments are planned
+          independently. Where you need balance across two attributes at once — sex{' '}
+          <em>and</em> skin tone — the binding constraint is the rarest combination,
+          not the rarest single category, and that needs more people than this shows.
         </>
       }
       controls={

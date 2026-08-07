@@ -8,7 +8,7 @@ describe('App shell', () => {
   it('renders the home page at the default route', () => {
     render(<App />);
     expect(
-      screen.getByRole('heading', { name: /design a measurement-validation study/i }),
+      screen.getByRole('heading', { name: /how many participants does your validation study need\?/i }),
     ).toBeInTheDocument();
   });
 

@@ -793,6 +793,94 @@ the second one was written *after* fixing the first.
 
 ---
 
+## Milestone 10: the site was organised around its own construction
+
+The first substantive design feedback, on a working and deployed site, was that
+it put the wrong thing at the centre. The example given:
+
+> *"This module exists because the source notebook computes the right quantiles
+> and reports them on the wrong scale. Both are shown below."*
+
+Nobody arrives at a sample-size calculator wondering why a module exists. The
+copy was written from the builder's chair, and once that was pointed out the
+same fault turned up structurally, not just in wording:
+
+- **A debugging artifact promoted to a result.** The Effect Size page showed
+  three intervals side by side, one of them knowingly wrong and captioned "the
+  notebook's output". That is not transparency, it is handing the reader your
+  homework — they came for an interval and got a puzzle. The Agreement page had
+  the same shape: the exact answer and a looser approximation, equal size, equal
+  weight, no guidance.
+- **Five modules presented as five equals, in build order.** Nothing said which
+  one you needed. Precision and Agreement overlap and the site never
+  distinguished them.
+- **Titles named the statistic, not the question.** "Precision vs sample size"
+  is what the module computes. "How precise will my study be?" is why anyone
+  opens it.
+
+### Users and journeys
+
+Four users, distinguished by the moment they arrive rather than by job title:
+the validation lead who needs a defensible n and protocol wording (primary); the
+regulatory reviewer who audits rather than computes; the academic with a fixed
+budget, who arrives with the *inverse* question; and the sceptic who has been
+handed an ICC and does not trust it.
+
+Five journeys, of which the site served one well. "Size a study from scratch"
+was fragmented across modules that do not hand off to each other. "Check the
+number I already have" is probably the most common real query and was nowhere
+acknowledged. "Fixed budget — what can I claim?" was answered precisely by the
+Precision module and advertised nowhere.
+
+The explainers turned out to be the strongest pages on the site, and for a
+reason worth generalising: they open with the reader's problem and close with
+what to do instead. They were the model the modules should have been following.
+
+### What changed
+
+Titles became questions, with the method name kept alongside so nothing became
+unfindable for someone who does know the term. Every module gained a stated
+assumption in the header — the thing a reader needs before carrying a number
+into a protocol — and a collapsed "Method and sources" section that holds the
+derivation, the comparison with other approaches, and the references. Provenance
+was not deleted; it was re-aimed, from "the notebook was wrong" to "here is why
+this differs from the number your other tool gave you", which is a question
+users actually have.
+
+The comparison tables moved into that section. Each page now leads with one
+answer at full weight.
+
+`MethodsText` generates the protocol sentence with the live numbers and carries
+the citations with it when copied — a sentence pasted without its reference is
+precisely the failure the component exists to prevent.
+
+### Verifying the copy button, and being wrong twice
+
+Driving the deployed build in headless Chrome, the copy button appeared to fail:
+permission denied, nothing on the clipboard, no feedback. That prompted a real
+improvement — the failure path did nothing at all, which makes a button look
+broken, so it now selects the paragraph and says which keys to press.
+
+Then the same check, run without `overridePermissions`, worked perfectly. The
+"denial" had been caused by the harness: explicitly overriding
+`clipboard-write` set a state that headless Chrome then refused, where the
+default behaviour under a genuine user gesture grants it. The tool built to
+verify the feature was the thing breaking it.
+
+The improvement stands — plain-http origins and embedded webviews do refuse, and
+silent failure was genuinely the wrong response — but the evidence that
+motivated it was an artifact. Worth recording as a class: *when a test harness
+reports a failure, confirm the harness is not the cause before believing it.*
+Third time in this project that a measuring instrument was the thing at fault,
+after SciPy's `betaln` and the fixture audit itself.
+
+**The lesson.** Every framing decision here was defensible from the inside and
+wrong from the outside, and no amount of care about correctness surfaces that —
+the statistics were right the whole time. It took someone reading the page as a
+user rather than as its author.
+
+---
+
 ## Concepts index
 
 **Numerical methods**
@@ -841,6 +929,16 @@ the second one was written *after* fixing the first.
   no more cheating and buries the signal in platform noise (M9).
 - Two phenomena can share one symptom; the first hypothesis explained 328 of
   1,466 cases, and the count is what exposed it (M9).
+
+**Product and design**
+- Name a page for the question the user arrived with, not the statistic that
+  answers it — and keep the statistic alongside so nothing becomes unfindable
+  (M10).
+- Showing a known-wrong result next to the right one is not transparency; it
+  hands the reader a decision they came to have made (M10).
+- Provenance is worth keeping and worth re-aiming: "why does this differ from
+  your other tool" is a user question, "what the source did" is not (M10).
+- When a harness reports a failure, rule out the harness first (M10).
 
 **A meta-lesson.** The hardest bugs here — the factor-of-two quantile, the
 invisible chart lines, the `betaln` disagreement — were all resolved by looking

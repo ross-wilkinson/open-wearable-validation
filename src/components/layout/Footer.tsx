@@ -14,8 +14,7 @@ export default function Footer() {
           >
             {AUTHOR.name}
           </a>
-          . Methods ported from working notebooks — see each module for its source and
-          assumptions.
+          . Every module states its method, its assumptions, and its references.
         </p>
         <p>
           Everything runs in your browser. No data is uploaded, stored, or sent

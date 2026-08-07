@@ -12,6 +12,9 @@ import {
 } from 'recharts';
 import { AlertTriangle } from 'lucide-react';
 import ModulePage from '../../components/common/ModulePage.tsx';
+import MethodsText from '../../components/common/MethodsText.tsx';
+import IntervalComparison from './IntervalComparison.tsx';
+import { CUMMING_2001, STEIGER_2004 } from '../../content/citations.ts';
 import NumberField from '../../components/common/NumberField.tsx';
 import SelectField from '../../components/common/SelectField.tsx';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
@@ -64,18 +67,53 @@ export default function EffectSizePage() {
 
   return (
     <ModulePage
-      title="Effect size confidence intervals"
+      title="How big is the effect, and how sure am I?"
+      method="Cohen's d confidence intervals from the non-central t"
       intro={
         <>
           <p>
-            A confidence interval for Cohen&rsquo;s d comes from inverting the{' '}
-            <em>non-central</em> t distribution — the set of noncentralities consistent
-            with what you observed. Most published intervals use a normal approximation
-            instead, which drifts at small n and large effects.
+            A point estimate of Cohen&rsquo;s d on its own says nothing about how much
+            of it is signal. This gives the interval around it, so you can report the
+            range your data actually supports — and see the sample size at which the
+            effect becomes distinguishable from none.
           </p>
           <p>
-            This module exists because the source notebook computes the right quantiles
-            and reports them on the wrong scale. Both are shown below.
+            The interval is obtained by inverting the <em>non-central</em> t
+            distribution, which stays accurate at small n where the normal
+            approximation most tools use starts to drift.
+          </p>
+        </>
+      }
+      assumption={
+        <>
+          the observations are independent and approximately normal, and{' '}
+          <em>d</em> is the observed effect rather than a hypothesised one. The
+          interval describes uncertainty about the effect you measured; it is not a
+          power calculation for an effect you hope to find.
+        </>
+      }
+      methodNotes={
+        <>
+          <p>
+            An exact interval for d comes from finding the set of noncentrality
+            parameters under which the observed t statistic is not extreme, then
+            converting back to the d scale. That conversion is the step to watch: for a
+            one-sample or paired design d = t/&radic;n, so noncentrality quantiles have
+            to be divided by &radic;n
+            {result ? ` — here, ${result.scaleFactor.toFixed(3)}` : ''} before they
+            are reported as effect sizes.
+          </p>
+          <p>
+            Omitting that division is a common implementation error, and it produces
+            intervals that are wrong by a factor of &radic;n. The tell is easy to check
+            and worth checking in any tool you use: an interval for an effect size that
+            does not contain the effect size.
+          </p>
+          {result && <IntervalComparison result={result} />}
+          <p>
+            Intervals are computed with Algorithm AS 243 (Lenth 1989). Where the
+            noncentrality d&nbsp;&times;&nbsp;&radic;n exceeds 37.6 the algorithm loses
+            accuracy, and this returns nothing rather than a confidently wrong answer.
           </p>
         </>
       }
@@ -157,87 +195,6 @@ export default function EffectSizePage() {
                 )}
               </p>
             </div>
-          </section>
-
-          <section aria-labelledby="comparison">
-            <h2
-              id="comparison"
-              className="text-sm font-semibold uppercase tracking-wide text-ink-muted"
-            >
-              Compared with the alternatives
-            </h2>
-            <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-surface">
-              <table className="w-full text-sm">
-                <caption className="sr-only">
-                  Comparison of interval methods for Cohen&rsquo;s d
-                </caption>
-                <thead>
-                  <tr>
-                    <th
-                      scope="col"
-                      className="border-b border-hairline px-4 py-2 text-left font-medium text-ink-muted"
-                    >
-                      Method
-                    </th>
-                    <th
-                      scope="col"
-                      className="border-b border-hairline px-4 py-2 text-right font-medium text-ink-muted"
-                    >
-                      Interval
-                    </th>
-                    <th
-                      scope="col"
-                      className="border-b border-hairline px-4 py-2 text-left font-medium text-ink-muted"
-                    >
-                      Contains d?
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-hairline">
-                    <td className="px-4 py-2 font-medium">
-                      Non-central t, rescaled
-                      <span className="ml-1.5 rounded bg-good/10 px-1.5 py-0.5 text-xs text-good">
-                        used here
-                      </span>
-                    </td>
-                    <td className="tabular px-4 py-2 text-right">
-                      [{result.lower.toFixed(3)}, {result.upper.toFixed(3)}]
-                    </td>
-                    <td className="px-4 py-2 text-good">yes</td>
-                  </tr>
-                  <tr className="border-b border-hairline">
-                    <td className="px-4 py-2">Hedges–Olkin normal approximation</td>
-                    <td className="tabular px-4 py-2 text-right text-ink-secondary">
-                      [{result.approxLower.toFixed(3)}, {result.approxUpper.toFixed(3)}]
-                    </td>
-                    <td className="px-4 py-2 text-ink-secondary">yes</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-2">
-                      Non-central t, <em>not</em> rescaled
-                      <span className="ml-1.5 text-xs text-ink-muted">
-                        (the notebook&rsquo;s output)
-                      </span>
-                    </td>
-                    <td className="tabular px-4 py-2 text-right text-ink-secondary">
-                      [{result.tScaleLower.toFixed(3)}, {result.tScaleUpper.toFixed(3)}]
-                    </td>
-                    <td className="px-4 py-2 text-critical">
-                      {result.tScaleLower <= result.d && result.tScaleUpper >= result.d
-                        ? 'yes'
-                        : 'no'}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-ink-muted">
-              The third row is on the <em>t</em> scale. Since d = t/&radic;n for a
-              one-sample or paired design, dividing by {result.scaleFactor.toFixed(3)}{' '}
-              gives the first row. An &ldquo;effect size interval&rdquo; that does not
-              contain the effect size is the tell.
-            </p>
           </section>
 
           <section className="rounded-xl border border-hairline bg-surface p-5">
@@ -351,6 +308,28 @@ export default function EffectSizePage() {
               </p>
             </div>
           </section>
+
+          <MethodsText
+            text={
+              `Cohen's d was ${result.d.toFixed(2)} ` +
+              `(${
+                result.design === 'two-sample'
+                  ? `two-sample, n = ${n} per group`
+                  : `${result.design}, n = ${n}`
+              }, df = ${result.df}), with a ` +
+              `${Math.round(result.confidence * 100)}% confidence interval of ` +
+              `[${result.lower.toFixed(2)}, ${result.upper.toFixed(2)}]. ` +
+              `The interval was obtained by inverting the non-central t distribution ` +
+              `rather than by normal approximation, which remains accurate at small ` +
+              `samples. The interval ${
+                result.excludesZero ? 'excludes' : 'includes'
+              } zero. ` +
+              `Expressed as a common-language effect size, a randomly chosen ` +
+              `observation from one condition exceeds one from the other ` +
+              `${(result.commonLanguage * 100).toFixed(0)}% of the time.`
+            }
+            citations={[STEIGER_2004, CUMMING_2001]}
+          />
         </>
       )}
     </ModulePage>

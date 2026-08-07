@@ -22,7 +22,7 @@ describe('TimelinePage', () => {
     render(<TimelinePage />);
 
     expect(
-      screen.getByRole('heading', { name: /study timeline simulator/i }),
+      screen.getByRole('heading', { name: /how long will it take\?/i }),
     ).toBeInTheDocument();
     expect(screen.getByDisplayValue('Ethics / IRB review')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Data collection')).toBeInTheDocument();

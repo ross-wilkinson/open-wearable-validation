@@ -75,19 +75,47 @@ export default function TimelinePage() {
 
   return (
     <ModulePage
-      title="Study timeline simulator"
+      title="How long will it take?"
+      method="Study duration Monte Carlo"
       intro={
         <>
           <p>
-            Sample each phase, sum, repeat. The result is the distribution of total
-            study duration — which is the thing you actually need when someone asks for
-            a completion date.
+            Break the study into phases, give each one a realistic spread, and this
+            simulates the whole thing thousands of times. What comes back is a
+            completion date with a confidence interval — the answer to give when
+            someone asks when you will be done, and the basis for a timeline you can
+            defend when one phase runs long.
           </p>
           <p>
-            The source notebook models every phase as Poisson, which forces variance to
-            equal the mean: a 28-day IRB review gets an SD of 5.3 days. Each phase here
-            carries its own distribution instead, so the spread can match how that phase
-            really behaves.
+            The number worth quoting is rarely the average. Plan to the 90th
+            percentile and you will be late one time in ten instead of one in two.
+          </p>
+        </>
+      }
+      assumption={
+        <>
+          phases run sequentially and their durations are independent. A delay that
+          pushes every downstream phase — a site closing, a supplier failing — is
+          correlated risk this does not model, and no amount of simulation substitutes
+          for a contingency plan.
+        </>
+      }
+      methodNotes={
+        <>
+          <p>
+            Each phase is sampled from its own distribution and the phases are summed;
+            repeating that many times builds the distribution of total duration.
+            Percentiles are read off the simulated totals directly rather than assumed
+            normal, because a sum of skewed phase durations is itself skewed.
+          </p>
+          <p>
+            A common shortcut models every phase as Poisson, which forces the variance
+            to equal the mean — a 28-day ethics review would be given an SD of 5.3
+            days whether or not that matches reality. Choosing a distribution per phase
+            avoids inheriting that constraint: use PERT when you have optimistic,
+            likely, and pessimistic estimates from the people doing the work, gamma or
+            lognormal when you have historical durations, and Poisson only for genuine
+            counts of events.
           </p>
         </>
       }

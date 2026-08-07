@@ -21,7 +21,7 @@ describe('PrecisionPage', () => {
     render(<PrecisionPage />);
 
     expect(
-      screen.getByRole('heading', { name: /precision vs sample size/i }),
+      screen.getByRole('heading', { name: /how precise will my study be\?/i }),
     ).toBeInTheDocument();
 
     // Default inspection point is n = 64 — the notebook's own worked example.
