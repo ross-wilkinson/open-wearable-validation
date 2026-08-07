@@ -1,0 +1,21 @@
+# Line endings are part of this repo's CI contract, not a local preference.
+#
+# The `fixtures` job regenerates src/stats/__fixtures__ and compares the result
+# to what is committed. That comparison is only meaningful if the committed
+# bytes are the same whichever machine produced them. Without a rule here, that
+# depends on each developer's core.autocrlf — true on the Windows box these were
+# generated on, false by default elsewhere — so a contributor with a different
+# setting would commit CRLF and fail CI for reasons unrelated to the numbers.
+
+* text=auto
+
+# The generator writes these with an explicit newline="\n"; keep them LF in the
+# working tree too, so what is on disk matches what CI regenerates byte for byte.
+src/stats/__fixtures__/*.json text eol=lf
+
+# Checked in as-is.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -569,6 +569,117 @@ The repo must be named `validation-study-designer` to match `base` in
 
 ---
 
+## Milestone 9: the first real CI run, which failed
+
+The section above drew a careful line between "verified locally" and "very
+likely to work". The first push settled it: `build` passed end to end — lint,
+typecheck, all 192 tests, the production build, the artifact upload — and
+`fixtures` failed, which skipped `deploy`.
+
+Worth noting what the caution was and was not worth. The doubt was about `base`
+and the Pages setting, and both of those were fine. The failure came from the
+job that had been described as "the whole safety net", which had never once run
+on a machine other than the one that wrote it.
+
+### The bug
+
+Every fixture file ends with a `_meta` block recording provenance:
+
+```json
+"_meta": { "scipy": "1.18.0", "numpy": "2.5.1", "python": "3.13.12" }
+```
+
+The check was `git diff --exit-code -- src/stats/__fixtures__`, and the workflow
+installed `scipy>=1.14` on `python-version: '3.13'`. Both are ranges. CI resolved
+them to different versions than the Windows box that generated the fixtures, the
+regenerated `_meta` differed, and a byte comparison failed on three lines
+containing no numerical content at all.
+
+So the guard compared provenance metadata alongside the values it existed to
+protect, and the metadata was guaranteed to drift.
+
+### Ruling things out, in order
+
+The environment was Windows, the runner Linux, so line endings were the obvious
+first suspect. They were innocent, and the check is worth recording:
+
+```
+core.autocrlf = true          # local
+git show HEAD:...normal.json  # committed blob: LF
+head -c 400 ...normal.json    # working tree:   CRLF
+```
+
+Git was normalising CRLF on disk to LF in the blob. CI checks out LF, Linux
+Python writes LF, so the two agree. Ruled out — but only because the *blob* was
+inspected rather than the file on disk. Checking the working tree alone would
+have found CRLF and produced a confident wrong answer.
+
+Second: could the values themselves differ? Python's float `repr` is
+shortest-round-trip and platform-independent, so formatting cannot vary; only
+values could. Regenerating locally produced byte-identical output, which
+established the fixtures were right *for that machine* and moved suspicion to
+the environment — where `_meta` was sitting in plain sight.
+
+The CI logs were not readable without a token, and there was no Docker or WSL to
+reproduce Linux locally. Both dead ends, and neither turned out to matter: the
+cause was reachable from the committed artefacts alone.
+
+### The fix, and why not the easy one
+
+Deleting `_meta` would have made CI green immediately. It is also the wrong
+change — that block is the only record of which SciPy produced these numbers,
+which is exactly what someone needs when a value is later disputed.
+
+The real defect was comparing bytes to answer a question about numbers. The
+guard exists to catch one thing: an expected value quietly edited to make a
+failing test pass. That is a numerical claim. So `tools/check_fixtures.py`
+regenerates into a temp directory, walks both structures in parallel, and
+compares every value at a **relative tolerance of 0** — ignoring `_meta`, which
+it reports as information instead.
+
+Exact comparison is deliberate. A tolerance loose enough to absorb version drift
+is loose enough to absorb a nudge, and a guard that tolerates the thing it
+guards against is decoration. Version drift is handled at the source instead:
+`numpy` and `scipy` are now pinned exactly, so the reference implementation
+changes only in a commit that says it is changing.
+
+It also fails legibly. `git diff --exit-code` on a 433 KB JSON file emits a wall
+of unreadable output; the checker prints the worst offenders with committed
+value, current value, and relative error, followed by the three explanations
+worth considering — an edited fixture, a genuine SciPy change, or a cross-platform
+ulp difference — because which one it is changes what should be done next.
+
+### Testing the guard
+
+A guard that has never failed is untested. Corrupting a value and confirming a
+non-zero exit is the minimum bar, and the first attempt at it was a dud: the
+chosen index was `ppf` at p = 0.5, whose value is `0.0`, so scaling it by
+`1 + 1e-7` changed nothing and the test "passed" without exercising anything.
+Retried against a non-zero entry, a nudge of one part in 10¹³ was caught — finer
+than most of the suite's own tolerances.
+
+The blunt version of that lesson: a test that cannot fail proves nothing, and
+multiplicative corruption cannot perturb zero.
+
+### One more latent bug, found on the way
+
+The repo had no `.gitattributes`. The line-ending investigation came out clean
+only because of a setting on one developer's machine — anyone cloning with
+`core.autocrlf=false` would commit CRLF fixtures and fail CI for reasons
+unrelated to the numbers. `* text=auto` now makes it a property of the repo, and
+the generator passes `newline="\n"` explicitly rather than inheriting the
+platform default. `git add --renormalize .` confirmed this rewrites nothing:
+every blob was already LF.
+
+**The lesson.** CI configuration is code, and it was the only code here with no
+test and no second environment to run in. The numerical core was checked against
+SciPy at roughly 7,000 grid points; the job checking it had been run zero times
+anywhere but the machine that wrote it. Infrastructure that only ever executes
+in the environment it was authored in is untested infrastructure, however
+carefully it was written.
+
+---
+
 ## Concepts index
 
 **Numerical methods**
@@ -598,6 +709,16 @@ The repo must be named `validation-study-designer` to match `base` in
 - `useSyncExternalStore` for OS preferences; `useMemo` for derived values;
   effects only for pushing state outward (M1, M5).
 - Web Worker stale-response rejection via the state updater (M5).
+
+**Infrastructure**
+- Comparing bytes to answer a question about numbers, and why provenance
+  metadata must sit outside the comparison (M9).
+- Pinning the reference implementation exactly, so it changes only in a commit
+  that says so (M9).
+- A guard that has never failed is untested — and multiplicative corruption
+  cannot perturb zero (M9).
+- Line endings as a repo contract rather than a local setting; inspect the blob,
+  not the working tree (M9).
 
 **A meta-lesson.** The hardest bugs here — the factor-of-two quantile, the
 invisible chart lines, the `betaln` disagreement — were all resolved by looking

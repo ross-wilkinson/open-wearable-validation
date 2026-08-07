@@ -30,9 +30,12 @@ The browser has no SciPy, so every distribution — normal, Student t,
 half-normal, Poisson, non-central t — is implemented from scratch in
 TypeScript. Hand-rolled special functions are subtly wrong by default, so each
 is tested against golden values generated from SciPy across thousands of grid
-points. `tools/generate_fixtures.py` emits those fixtures; CI regenerates them
-and fails if the committed copies drifted, which is the only way a quietly
-edited expected value gets caught.
+points. `tools/generate_fixtures.py` emits those fixtures; `tools/check_fixtures.py`
+regenerates them in CI and fails if any committed value drifted, which is the only
+way a quietly edited expected value gets caught. It compares values rather than
+file bytes, at a relative tolerance of exactly zero — SciPy and NumPy are pinned
+to exact versions so the reference implementation changes only in a commit that
+says it is changing.
 
 Two places where the reference turned out to be the less accurate side are
 documented in the code and graded against exact arithmetic instead:

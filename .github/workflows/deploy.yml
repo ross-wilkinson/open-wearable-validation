@@ -55,6 +55,12 @@ jobs:
   # fails if the committed copies drifted — which is the only way a silently
   # edited fixture ("the test was failing so I nudged the expected value") gets
   # caught. It is the whole safety net for the numerical core.
+  #
+  # numpy and scipy are pinned exactly, not floored. A floor means this job
+  # compares against whatever SciPy shipped this morning, so the reference
+  # implementation can change under you and the failure arrives attached to an
+  # unrelated commit. Bumping these pins should be its own reviewed change, with
+  # any resulting fixture churn visible in the same diff.
   fixtures:
     runs-on: ubuntu-latest
     steps:
@@ -62,10 +68,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: pip install "numpy>=2" "scipy>=1.14"
-      - run: python tools/generate_fixtures.py
-      - name: Fail if regenerated fixtures differ from the committed ones
-        run: git diff --exit-code -- src/stats/__fixtures__
+      - run: pip install numpy==2.5.1 scipy==1.18.0
+      # Compares the values, not the bytes. `git diff --exit-code` was the first
+      # version of this and it was wrong: each fixture carries a `_meta` block
+      # naming the Python that produced it, so the job failed on a patch-version
+      # difference carrying no numerical content at all.
+      - run: python tools/check_fixtures.py
 
 # One-time manual step this workflow cannot do for you:
 #   repo Settings -> Pages -> Source = "GitHub Actions".

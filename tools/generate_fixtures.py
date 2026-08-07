@@ -21,6 +21,7 @@ A failing test means the TypeScript is wrong, not the fixture.
 
 from __future__ import annotations
 
+import argparse
 import json
 import pathlib
 import platform
@@ -29,8 +30,10 @@ import numpy as np
 import scipy
 from scipy.stats import halfnorm, nct, norm, poisson, t
 
-OUT = pathlib.Path(__file__).resolve().parent.parent / "src" / "stats" / "__fixtures__"
-OUT.mkdir(parents=True, exist_ok=True)
+DEFAULT_OUT = (
+    pathlib.Path(__file__).resolve().parent.parent / "src" / "stats" / "__fixtures__"
+)
+OUT = DEFAULT_OUT
 
 # Degrees of freedom worth covering: 1 and 2 are pathological (Cauchy-ish,
 # undefined variance), the middle is the realistic study-size range, and 500
@@ -59,7 +62,12 @@ def dump(name: str, payload: dict) -> None:
                 "the TypeScript is wrong. Do not regenerate to make it pass.",
     }
     path = OUT / f"{name}.json"
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # newline="\n" explicitly: the default would translate to CRLF on Windows,
+    # which only stays invisible because git's autocrlf normalises it back on
+    # commit. That is a per-developer setting, not a repo guarantee — someone
+    # with autocrlf=false would commit CRLF and break the CI check for reasons
+    # having nothing to do with the numbers.
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8", newline="\n")
     print(f"  {path.name:24s} {path.stat().st_size:>8,d} bytes")
 
 
@@ -482,6 +490,18 @@ def gen_special() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--out",
+        type=pathlib.Path,
+        default=DEFAULT_OUT,
+        help="directory to write the JSON fixtures into "
+             "(default: src/stats/__fixtures__). tools/check_fixtures.py points "
+             "this at a temp dir so it can compare without touching the repo.",
+    )
+    OUT = parser.parse_args().out
+    OUT.mkdir(parents=True, exist_ok=True)
+
     print("Generating golden fixtures ->", OUT)
     gen_special()
     gen_normal()
