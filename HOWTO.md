@@ -671,12 +671,67 @@ the generator passes `newline="\n"` explicitly rather than inheriting the
 platform default. `git add --renormalize .` confirmed this rewrites nothing:
 every blob was already LF.
 
+### The second failure, which was the same mistake one layer down
+
+The fix above went green locally and failed again on push — this time in
+`check_fixtures.py` itself, which meant real values, not metadata. The cause was
+in `gen_nct`:
+
+```python
+want = nct.cdf(x, df, nc)
+if np.isfinite(want):
+    cdf_cases.append(...)       # 2412 entries, graded against SciPy
+else:
+    cdf_scipy_nan.append(...)   #   84 entries, SciPy gave up
+```
+
+The deep tail of `nct.cdf` is where SciPy's Cephes routine surrenders and
+returns NaN. That was already known and documented — it is why the second list
+exists. What was missed is that **where it surrenders is platform-dependent**.
+Windows found 84 such points; Linux need only disagree about one.
+
+And when it disagrees, both arrays change length and every entry after the
+divergence shifts by one index. The comparison walks `cdf[i]` against `cdf[i]`,
+so a single boundary point moving cascades into ~2,400 mismatches, every one of
+them comparing two unrelated grid points. A one-value disagreement presenting as
+total failure.
+
+The underlying error is the same one as `_meta`, one layer down: something
+environment-dependent leaking into an artifact whose whole purpose is to be
+environment-independent. The first round fixed the symptom and not the class.
+The values in these fixtures were always going to be roughly portable; the
+*shape* was not, because the shape was being derived from the reference
+implementation's failure mode.
+
+Now every grid point is emitted, in grid order, with `want: null` where SciPy
+declined. Structure comes from three hard-coded lists and nothing else, so it is
+identical everywhere, and the TypeScript partitions on `want === null` at load
+time — which is where that decision belonged. A platform disagreement is now one
+entry, reported and not fatal, since it is a disagreement between two builds of
+the *reference* and there is no golden value on either side to compare.
+
+Verified by flipping one boundary point's null-ness: the scenario that produced
+thousands of cascaded mismatches produces one informational line and exit 0,
+while a 1e-13 nudge to a real value still fails.
+
+That verification also produced its own small lesson. The first attempt showed
+two mismatches with infinite error for a one-value change, which made no sense.
+The cause was the test, not the code: the regenerated fixtures were not yet
+committed, so restoring with `git checkout --` reverted the file to the *old
+schema* and the checker was comparing two different formats. Reaching for git as
+an undo only works on things git already knows about.
+
 **The lesson.** CI configuration is code, and it was the only code here with no
 test and no second environment to run in. The numerical core was checked against
 SciPy at roughly 7,000 grid points; the job checking it had been run zero times
 anywhere but the machine that wrote it. Infrastructure that only ever executes
 in the environment it was authored in is untested infrastructure, however
 carefully it was written.
+
+The sharper version, learned twice in two commits: an artifact meant to be
+reproducible must not take its structure — or its metadata — from the
+environment that produced it. Both failures here were that same sentence, and
+the second one was written *after* fixing the first.
 
 ---
 
@@ -719,6 +774,11 @@ carefully it was written.
   cannot perturb zero (M9).
 - Line endings as a repo contract rather than a local setting; inspect the blob,
   not the working tree (M9).
+- Never derive a fixture's *shape* from the reference's failure mode — where
+  SciPy gives up moves between platforms, and one boundary point shifting
+  cascades into thousands of false mismatches (M9).
+- `git checkout --` is not an undo for a file whose current form was never
+  committed (M9).
 
 **A meta-lesson.** The hardest bugs here — the factor-of-two quantile, the
 invisible chart lines, the `betaln` disagreement — were all resolved by looking

@@ -166,29 +166,35 @@ def gen_nct() -> None:
     # nct.cdf(-6, df=199, nc=21), where the true probability is an underflow to
     # zero (nct.sf there returns exactly 1.0). Its Cephes routine gives up
     # rather than returning 0. These are not targets to hit: they are cases
-    # where the reference is the broken one. They are excluded from the graded
-    # grid and listed separately, where the only assertion is that our
-    # implementation stays finite and in [0, 1] — i.e. degrades better than
-    # SciPy does.
-    cdf_cases, cdf_scipy_nan = [], []
+    # where the reference is the broken one. `want: null` marks them, and the
+    # only assertion made about them is that our implementation stays finite and
+    # in [0, 1] — i.e. degrades better than SciPy does.
+    #
+    # Every grid point is emitted, in grid order, whether SciPy managed it or
+    # not. An earlier version split them into two lists here, which made the
+    # *shape* of this file depend on where SciPy gave up — and that point moves
+    # between platforms. One boundary point shifting turned into a length change
+    # plus thousands of cascaded false mismatches comparing unrelated grid
+    # points. The structure now comes from the three hard-coded grids above and
+    # from nothing else, so a genuine divergence is a single changed entry.
+    cdf_cases = []
     for df in nct_dfs:
         for nc in ncs:
             for x in xs:
                 want = nct.cdf(x, df, nc)
+                case = {"x": x, "df": df, "nc": nc}
                 if np.isfinite(want):
-                    cdf_cases.append({"x": x, "df": df, "nc": nc, "want": f(want)})
+                    case["want"] = f(want)
                 else:
                     sf = nct.sf(x, df, nc)
-                    cdf_scipy_nan.append({
-                        "x": x, "df": df, "nc": nc,
-                        # sf == 1.0 means the cdf underflows; anything else
-                        # gives us a usable complement.
-                        "want_approx": f(1.0 - sf) if sf != 1.0 else 0.0,
-                    })
+                    case["want"] = None
+                    # sf == 1.0 means the cdf underflows; anything else gives us
+                    # a usable complement.
+                    case["want_approx"] = f(1.0 - sf) if sf != 1.0 else 0.0
+                cdf_cases.append(case)
 
     dump("nonCentralT", {
         "cdf": cdf_cases,
-        "cdf_scipy_nan": cdf_scipy_nan,
         "ppf": [{"p": p, "df": df, "nc": nc, "want": f(nct.ppf(p, df, nc))}
                 for df in nct_dfs for nc in ncs
                 for p in [0.005, 0.025, 0.05, 0.1, 0.5, 0.9, 0.95, 0.975, 0.995]],

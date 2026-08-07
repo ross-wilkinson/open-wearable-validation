@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as nct from './nonCentralT.ts';
 import * as studentT from './studentT.ts';
-import { checkGrid, formatMismatches, nonCentralTFixture } from './testing/fixtures.ts';
+import {
+  checkGrid,
+  formatMismatches,
+  nctGradedCdf,
+  nctScipyNanCdf,
+  nonCentralTFixture,
+} from './testing/fixtures.ts';
 
 describe('nonCentralT', () => {
   it('cdf matches SciPy across the (df, nc, x) grid', () => {
@@ -16,7 +22,7 @@ describe('nonCentralT', () => {
     // relative arm applies and holds to 1e-9. Nothing in the app reads a
     // non-central t probability of 1e-77.
     const bad = checkGrid(
-      nonCentralTFixture.cdf,
+      nctGradedCdf,
       (c) => ({
         got: nct.cdf(c.x, c.df, c.nc),
         want: c.want,
@@ -38,7 +44,7 @@ describe('nonCentralT', () => {
     // supports a 1e-9 relative claim only for want > ~3e-6. Measured, cases at
     // exactly 1e-6 fail at 1e-9 to 3.4e-9 — the arithmetic, confirmed. The
     // cutoff is set at 1e-4 for two orders of margin.
-    const usable = nonCentralTFixture.cdf.filter(
+    const usable = nctGradedCdf.filter(
       (c) => c.want > 1e-4 && c.want < 1 - 1e-4,
     );
     expect(usable.length).toBeGreaterThan(500);
@@ -88,8 +94,8 @@ describe('nonCentralT', () => {
     // to zero. There is no golden value to match here, because the reference is
     // the broken one. The claim is only that this implementation degrades
     // gracefully instead of propagating NaN into a chart.
-    expect(nonCentralTFixture.cdf_scipy_nan.length).toBeGreaterThan(0);
-    for (const c of nonCentralTFixture.cdf_scipy_nan) {
+    expect(nctScipyNanCdf.length).toBeGreaterThan(0);
+    for (const c of nctScipyNanCdf) {
       const got = nct.cdf(c.x, c.df, c.nc);
       expect(Number.isFinite(got), `cdf(${c.x}, ${c.df}, ${c.nc}) = ${got}`).toBe(true);
       expect(got).toBeGreaterThanOrEqual(0);

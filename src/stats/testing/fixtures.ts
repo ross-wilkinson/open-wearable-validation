@@ -17,6 +17,35 @@ export {
 };
 
 /**
+ * Non-central t CDF grid, split by whether SciPy produced an answer at all.
+ *
+ * The JSON holds every grid point in grid order with `want: null` where SciPy's
+ * Cephes routine gave up. Splitting here rather than in the generator is what
+ * keeps the file's shape identical on every platform: where SciPy surrenders
+ * moves between Windows and Linux, and when that decided which of two arrays a
+ * point landed in, one boundary point shifting cascaded into thousands of
+ * mismatches comparing unrelated grid points.
+ */
+export interface NctCdfCase {
+  x: number;
+  df: number;
+  nc: number;
+  want: number | null;
+  want_approx?: number;
+}
+
+const nctCdfGrid: readonly NctCdfCase[] = nonCentralTFixture.cdf;
+
+/** Points SciPy answered — graded against it. */
+export const nctGradedCdf: readonly (NctCdfCase & { want: number })[] =
+  nctCdfGrid.filter((c): c is NctCdfCase & { want: number } => c.want !== null);
+
+/** Points SciPy declined — no golden value exists, so only sanity is asserted. */
+export const nctScipyNanCdf: readonly NctCdfCase[] = nctCdfGrid.filter(
+  (c) => c.want === null,
+);
+
+/**
  * Assert `got` matches SciPy's `want` to `tolerance` *relative* error, falling
  * back to absolute error near zero.
  *
