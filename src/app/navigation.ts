@@ -103,6 +103,16 @@ export const MODULE_ROUTES: ModuleRoute[] = [
     status: 'ready',
     inNav: true,
   },
+  {
+    path: '/chance-kpi',
+    label: 'Pass by chance?',
+    title: 'Did we pass our KPIs by chance?',
+    method: 'Permutation null distribution & Preiss–Fisher separation index',
+    blurb:
+      'Test whether passing a KPI was genuine or an artifact of narrow reference dynamic range. Randomly mispair 10,000 times to uncover false-pass hazards and find defensible 5% KPI thresholds.',
+    status: 'ready',
+    inNav: true,
+  },
 ];
 
 export const EXPLAINER_ROUTES: ModuleRoute[] = [

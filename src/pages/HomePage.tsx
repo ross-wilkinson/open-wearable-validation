@@ -270,6 +270,10 @@ export default function HomePage() {
               question: 'How do I present and report validation findings across cross-functional teams?',
             },
             {
+              path: '/chance-kpi',
+              question: 'Did our device pass its accuracy KPI purely by chance?',
+            },
+            {
               path: '/explainers/agreement-vs-icc',
               question: 'Why can two devices have identical agreement but wildly different ICCs?',
             },

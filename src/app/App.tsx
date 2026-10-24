@@ -10,6 +10,7 @@ import DemographicsPage from '../modules/demographics/DemographicsPage.tsx';
 import TimelinePage from '../modules/timeline/TimelinePage.tsx';
 import EffectSizePage from '../modules/effectSize/EffectSizePage.tsx';
 import ReportStudioPage from '../modules/reportStudio/ReportStudioPage.tsx';
+import ChanceKpiPage from '../modules/chanceKpi/ChanceKpiPage.tsx';
 import ExplainersPage from '../pages/ExplainersPage.tsx';
 import AboutPage from '../pages/AboutPage.tsx';
 import RmseExplainerPage from '../modules/explainers/RmseExplainerPage.tsx';
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="/timeline" element={<TimelinePage />} />
               <Route path="/effect-size" element={<EffectSizePage />} />
               <Route path="/report-studio" element={<ReportStudioPage />} />
+              <Route path="/chance-kpi" element={<ChanceKpiPage />} />
               <Route path="/explainers" element={<ExplainersPage />} />
               <Route path="/explainers/rmse-mae" element={<RmseExplainerPage />} />
               <Route

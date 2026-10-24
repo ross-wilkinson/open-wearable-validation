@@ -47,3 +47,8 @@ export const ZOU_2013: Citation = {
   url: 'https://doi.org/10.1002/sim.5735',
 };
 
+export const PREISS_FISHER_2008: Citation = {
+  text: 'Preiss D, Fisher J. A measure of confidence in Bland-Altman analysis for the interchangeability of two methods of measurement. J Clin Monit Comput. 2008;22(4):257-59.',
+  url: 'https://doi.org/10.1007/s10877-008-9127-y',
+};
+
