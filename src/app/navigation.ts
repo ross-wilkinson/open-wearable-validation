@@ -44,6 +44,16 @@ export const MODULE_ROUTES: ModuleRoute[] = [
     inNav: true,
   },
   {
+    path: '/repeated-measures',
+    label: 'Repeated measures',
+    title: 'How many subjects and replicates do I need?',
+    method: 'Within-subject repeated measures & variance decomposition',
+    blurb:
+      'Account for clustering in paired designs: trade off participants vs replicates, decompose variance, and compute effective sample size and limits-of-agreement precision.',
+    status: 'ready',
+    inNav: true,
+  },
+  {
     path: '/precision',
     label: 'Precision',
     title: 'How precise will my study be?',

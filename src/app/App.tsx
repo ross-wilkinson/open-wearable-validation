@@ -5,6 +5,7 @@ import Footer from '../components/layout/Footer.tsx';
 import HomePage from '../pages/HomePage.tsx';
 import PrecisionPage from '../modules/precision/PrecisionPage.tsx';
 import AgreementPage from '../modules/agreement/AgreementPage.tsx';
+import RepeatedMeasuresPage from '../modules/repeatedMeasures/RepeatedMeasuresPage.tsx';
 import DemographicsPage from '../modules/demographics/DemographicsPage.tsx';
 import TimelinePage from '../modules/timeline/TimelinePage.tsx';
 import EffectSizePage from '../modules/effectSize/EffectSizePage.tsx';
@@ -31,8 +32,9 @@ export default function App() {
           <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/precision" element={<PrecisionPage />} />
               <Route path="/agreement" element={<AgreementPage />} />
+              <Route path="/repeated-measures" element={<RepeatedMeasuresPage />} />
+              <Route path="/precision" element={<PrecisionPage />} />
               <Route path="/demographics" element={<DemographicsPage />} />
               <Route path="/timeline" element={<TimelinePage />} />
               <Route path="/effect-size" element={<EffectSizePage />} />

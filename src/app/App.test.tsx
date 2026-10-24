@@ -8,7 +8,9 @@ describe('App shell', () => {
   it('renders the home page at the default route', () => {
     render(<App />);
     expect(
-      screen.getByRole('heading', { name: /how many participants does your validation study need\?/i }),
+      screen.getByRole('heading', {
+        name: /everything you need to design, size, and analyze human-subject validation studies/i,
+      }),
     ).toBeInTheDocument();
   });
 
@@ -17,6 +19,16 @@ describe('App shell', () => {
     for (const route of MODULE_ROUTES) {
       expect(screen.getByRole('heading', { name: route.title })).toBeInTheDocument();
     }
+  });
+
+  it('displays links to Health Data Distributions and agreekit', () => {
+    render(<App />);
+    expect(
+      screen.getAllByRole('link', { name: /health data distributions/i }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('link', { name: /agreekit/i }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('shows a not-found page for an unknown route', () => {

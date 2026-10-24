@@ -292,9 +292,34 @@ export default function DemographicsPage() {
           </section>
         </>
       )}
+
+      {/* Companion Ecosystem: Health Data Distributions */}
+      <section className="rounded-xl border border-hairline bg-surface p-4 text-xs leading-relaxed text-ink-secondary">
+        <p>
+          <strong className="text-ink">Need empirical population distributions?</strong>{' '}
+          Browse stratified percentiles across sex, age brackets, and Monk skin tone categories
+          derived from CDC NHANES and SCIN datasets at{' '}
+          <a
+            href="https://ross-wilkinson.github.io/health-data-distributions/"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-series-1 underline underline-offset-2 hover:opacity-80"
+          >
+            Health Data Distributions ↗
+          </a>
+          .
+        </p>
+      </section>
+
       <NextSteps
         offer={{ n: sampleSize, source: 'recruitment plan' }}
         steps={[
+          {
+            to: '/repeated-measures',
+            title: 'Design for repeated measures',
+            description:
+              'Evaluate within-subject designs and trade off participants vs replicates.',
+          },
           {
             to: '/timeline',
             title: 'How long will it take?',

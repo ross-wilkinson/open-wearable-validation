@@ -36,3 +36,14 @@ export const STEIGER_2004: Citation = {
   text: 'Steiger JH. Beyond the F test: effect size confidence intervals and tests of close fit in the analysis of variance and contrast analysis. Psychol Methods. 2004;9(2):164-82.',
   url: 'https://doi.org/10.1037/1082-989X.9.2.164',
 };
+
+export const BLAND_ALTMAN_2007: Citation = {
+  text: 'Bland JM, Altman DG. Agreement between methods of measurement with multiple observations per individual. J Biopharm Stat. 2007;17(4):571-82.',
+  url: 'https://doi.org/10.1080/10543400701329422',
+};
+
+export const ZOU_2013: Citation = {
+  text: 'Zou GY. Confidence interval estimation for limits of agreement using paired data. Stat Med. 2013;32(23):3985-4000.',
+  url: 'https://doi.org/10.1002/sim.5735',
+};
+

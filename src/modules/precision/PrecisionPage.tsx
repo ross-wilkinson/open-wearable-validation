@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ModulePage from '../../components/common/ModulePage.tsx';
 import NextSteps from '../../app/study/NextSteps.tsx';
 import { useStudy } from '../../app/study/StudyContext.tsx';
@@ -352,10 +353,34 @@ export default function PrecisionPage() {
           and the curve says so.
         </p>
       </section>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink">
+            Have multiple observations per participant?
+          </p>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            The curves above assume independent paired observations (k = 1). For repeated measures, between-subject clustering inflates variance.
+          </p>
+        </div>
+        <Link
+          to="/repeated-measures"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-series-1 transition-colors hover:bg-ink/5"
+        >
+          Model repeated measures &rarr;
+        </Link>
+      </div>
+
       <NextSteps
         offer={{ n: selectedN, source: 'precision at this n' }}
         confidence={Number(confidence)}
         steps={[
+          {
+            to: '/repeated-measures',
+            title: 'Design for repeated measures',
+            description:
+              'Evaluate within-subject designs, trade off subjects vs replicates, and calculate effective sample size.',
+          },
           {
             to: '/demographics',
             title: 'Who do I need to recruit?',

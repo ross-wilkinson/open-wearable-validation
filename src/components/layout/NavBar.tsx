@@ -6,7 +6,7 @@ import ThemeToggle from './ThemeToggle.tsx';
 
 function linkClass({ isActive }: { isActive: boolean }): string {
   return [
-    'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+    'whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors xl:text-sm',
     isActive
       ? 'bg-series-1/10 text-series-1'
       : 'text-ink-secondary hover:bg-ink/5 hover:text-ink',
@@ -91,6 +91,31 @@ export default function NavBar() {
               <NavLink to="/about" className={linkClass} onClick={() => setOpen(false)}>
                 About
               </NavLink>
+            </li>
+            <li className="mt-2 border-t border-hairline pt-2">
+              <span className="block px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                Ecosystem
+              </span>
+            </li>
+            <li>
+              <a
+                href="https://ross-wilkinson.github.io/health-data-distributions/"
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-md px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 hover:text-ink"
+              >
+                Health Data Distributions ↗
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://github.com/ross-wilkinson/agreekit"
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-md px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 hover:text-ink"
+              >
+                agreekit (Python) ↗
+              </a>
             </li>
           </ul>
         </nav>

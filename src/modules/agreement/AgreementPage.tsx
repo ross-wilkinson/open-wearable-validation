@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   CartesianGrid,
   Line,
@@ -278,6 +279,23 @@ export default function AgreementPage() {
         </div>
       </section>
 
+      <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink">
+            Planning repeated measurements per participant?
+          </p>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            Most wearable and algorithm validation studies collect multiple paired readings per person. Sizing repeated measures requires decomposing between- vs within-subject variance.
+          </p>
+        </div>
+        <Link
+          to="/repeated-measures"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-series-1 transition-colors hover:bg-ink/5"
+        >
+          Repeated measures designer &rarr;
+        </Link>
+      </div>
+
       <section aria-labelledby="equivalence">
         <h2
           id="equivalence"
@@ -385,6 +403,12 @@ export default function AgreementPage() {
         }
         confidence={Number(confidence)}
         steps={[
+          {
+            to: '/repeated-measures',
+            title: 'Design for repeated measures',
+            description:
+              'Evaluate within-subject designs, trade off subjects vs replicates, and calculate effective sample size.',
+          },
           {
             to: '/demographics',
             title: 'Who do I need to recruit?',
