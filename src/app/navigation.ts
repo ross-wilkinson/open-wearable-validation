@@ -93,6 +93,16 @@ export const MODULE_ROUTES: ModuleRoute[] = [
     status: 'ready',
     inNav: true,
   },
+  {
+    path: '/report-studio',
+    label: 'Report studio',
+    title: 'How do I present and report validation findings?',
+    method: 'Executive scorecard, Bland-Altman clusters & survival of error',
+    blurb:
+      'Empower cross-functional stakeholders with clinical tolerance scorecards, hierarchical variance decomposition, Bland-Altman agreement with subject clusters, and survival-type absolute error distributions.',
+    status: 'ready',
+    inNav: true,
+  },
 ];
 
 export const EXPLAINER_ROUTES: ModuleRoute[] = [

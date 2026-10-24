@@ -266,6 +266,10 @@ export default function HomePage() {
               question: "How do I report Cohen's d confidence intervals honestly at small n?",
             },
             {
+              path: '/report-studio',
+              question: 'How do I present and report validation findings across cross-functional teams?',
+            },
+            {
               path: '/explainers/agreement-vs-icc',
               question: 'Why can two devices have identical agreement but wildly different ICCs?',
             },

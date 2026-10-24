@@ -1,0 +1,1312 @@
+/**
+ * Module: Validation Report Studio & Error Distribution Diagnostics.
+ *
+ * Core teachings:
+ * 1. Systems that scale: HTML + JavaScript & Plx Dashboards bypass restrictive
+ *    enterprise permissions and infra data silos. Self-contained, client-side
+ *    reporting enables zero-permission portability and reproducible cross-functional audits.
+ * 2. Cross-functional empowerment: Product, Algorithm/Engineering, and Clinical/Regulatory
+ *    stakeholders each require a tailored lens onto the same underlying validation findings.
+ * 3. Hierarchical data-generating process: Sensor validation data is clustered within
+ *    subjects. Between-subject variance (sigma_b) and within-subject variance (sigma_w)
+ *    must be decomposed via ANOVA. Naive pooled statistics dramatically understate uncertainty.
+ * 4. Survival of Error distributions: Bland-Altman limits (mean & variance) assume normality
+ *    and hide heavy tails. "Survival-type" absolute error analysis (P(|error| > x) and
+ *    empirical coverage P(|error| <= x)) exposes rare catastrophic failures, motion artifacts,
+ *    and non-Gaussian clinical hazards.
+ *
+ * References:
+ * - Bland JM, Altman DG. Agreement between methods of measurement with multiple
+ *   observations per individual. J Biopharm Stat. 2007;17(4):571-82.
+ * - ISO 80601-2-61:2017 Medical electrical equipment -- Pulse oximeters.
+ * - ANSI/CTA-2065: Physical Activity and Physiological Monitoring.
+ * - de Zambotti M, et al. Measures of sleep and agreement between polysomnography
+ *   and wearable sensors. Sleep. 2020.
+ */
+
+import * as normal from '../../stats/normal.ts';
+import * as studentT from '../../stats/studentT.ts';
+
+export interface SleepStageMetric {
+  stage: string;
+  count: number;
+  sensitivity: number;
+  specificity: number;
+  ppv: number;
+}
+
+export interface SleepStagingSummary {
+  classes: string[];
+  matrix: number[][]; // Row: PSG Reference, Column: Device Wearable
+  totalEpochs: number;
+  overallAccuracy: number;
+  cohensKappa: number;
+  tstBiasMinutes: number;
+  tstLoaMinutes: [number, number];
+  stageMetrics: SleepStageMetric[];
+}
+
+export interface ReportStudioPreset {
+  id: string;
+  name: string;
+  domain: string;
+  description: string;
+  unit: string;
+  regulatoryStandard: string;
+  referenceName: string;
+  deviceName: string;
+  defaultM: number;
+  defaultK: number;
+  defaultBias: number;
+  defaultSdB: number;
+  defaultSdW: number;
+  defaultOutlierRate: number;
+  defaultOutlierScale: number;
+  toleranceWindow: number;
+  targetCoveragePct: number;
+  armsTarget: number;
+  p95Target: number;
+  sleepSummary?: SleepStagingSummary;
+}
+
+export const REPORT_STUDIO_PRESETS: ReportStudioPreset[] = [
+  {
+    id: 'spo2',
+    name: 'Pulse Oximetry (SpO2)',
+    domain: 'Clinical Hypoxia / ISO 80601-2-61',
+    description:
+      'Controlled multi-stage desaturation protocol (70%–100% SaO2) evaluating investigational optical pulse oximeter against reference multi-wavelength CO-oximetry arterial blood draws.',
+    unit: '%',
+    regulatoryStandard: 'ISO 80601-2-61 / FDA SpO2 Guidance (Arms <= 3.0%, >= 200 paired pts)',
+    referenceName: 'Blood CO-oximetry (SaO2)',
+    deviceName: 'Investigational SpO2 Wearable',
+    defaultM: 24,
+    defaultK: 8,
+    defaultBias: 0.35,
+    defaultSdB: 1.15,
+    defaultSdW: 1.55,
+    defaultOutlierRate: 0.035,
+    defaultOutlierScale: 3.2,
+    toleranceWindow: 3.0,
+    targetCoveragePct: 95.0,
+    armsTarget: 3.0,
+    p95Target: 3.8,
+  },
+  {
+    id: 'heart-rate',
+    name: 'Exercise Heart Rate (Wearable vs ECG)',
+    domain: 'Sports & Cardiovascular / CTA-2065',
+    description:
+      'Multi-stage exercise treadmill and cycling protocol pairing optical photoplethysmography (PPG) wrist monitor against continuous 12-lead ECG telemetry. Heavy tails arise from motion artifacts and cadence lock.',
+    unit: 'bpm',
+    regulatoryStandard: 'ANSI/CTA-2065 & AAMI EC13 (Within 5 bpm or 10%, MAPE <= 7%)',
+    referenceName: '12-lead ECG Telemetry',
+    deviceName: 'Wrist PPG Optical Monitor',
+    defaultM: 32,
+    defaultK: 10,
+    defaultBias: 0.75,
+    defaultSdB: 2.1,
+    defaultSdW: 3.8,
+    defaultOutlierRate: 0.065,
+    defaultOutlierScale: 7.5,
+    toleranceWindow: 5.0,
+    targetCoveragePct: 85.0,
+    armsTarget: 5.0,
+    p95Target: 8.5,
+  },
+  {
+    id: 'sleep-staging',
+    name: 'Sleep Staging (Wearable vs PSG)',
+    domain: 'Sleep Architecture / SRI Multi-level Evaluation',
+    description:
+      'In-lab overnight polysomnography (PSG) 30-second epoch comparison against multisensor wearable sleep staging algorithm (Wake, Light N1+N2, Deep N3, REM).',
+    unit: 'min',
+    regulatoryStandard: 'AASM Guidelines & SRI Wearable Sleep Framework (Kappa >= 0.70)',
+    referenceName: 'Clinical Polysomnography (PSG)',
+    deviceName: 'Multisensor Sleep Tracker',
+    defaultM: 28,
+    defaultK: 6,
+    defaultBias: -6.5,
+    defaultSdB: 14.0,
+    defaultSdW: 18.0,
+    defaultOutlierRate: 0.05,
+    defaultOutlierScale: 25.0,
+    toleranceWindow: 30.0,
+    targetCoveragePct: 90.0,
+    armsTarget: 25.0,
+    p95Target: 35.0,
+    sleepSummary: {
+      classes: ['Wake', 'Light (N1/N2)', 'Deep (N3)', 'REM'],
+      // 4x4 matrix: Rows = PSG Reference, Columns = Wearable Device
+      matrix: [
+        [2840, 420, 50, 110], // True Wake
+        [410, 11420, 780, 890], // True Light
+        [30, 810, 3950, 60], // True Deep
+        [120, 760, 40, 4520], // True REM
+      ],
+      totalEpochs: 27210,
+      overallAccuracy: 0.835,
+      cohensKappa: 0.732,
+      tstBiasMinutes: -8.4,
+      tstLoaMinutes: [-38.2, 21.4],
+      stageMetrics: [
+        {
+          stage: 'Wake',
+          count: 3420,
+          sensitivity: 0.83,
+          specificity: 0.976,
+          ppv: 0.835,
+        },
+        {
+          stage: 'Light (N1/N2)',
+          count: 13500,
+          sensitivity: 0.846,
+          specificity: 0.855,
+          ppv: 0.852,
+        },
+        {
+          stage: 'Deep (N3)',
+          count: 4850,
+          sensitivity: 0.814,
+          specificity: 0.961,
+          ppv: 0.819,
+        },
+        {
+          stage: 'REM',
+          count: 5440,
+          sensitivity: 0.831,
+          specificity: 0.951,
+          ppv: 0.809,
+        },
+      ],
+    },
+  },
+];
+
+export interface PairedObservation {
+  id: string;
+  subjectId: number;
+  obsIndex: number;
+  refValue: number;
+  devValue: number;
+  diff: number; // dev - ref
+  absDiff: number;
+  isOutlier: boolean;
+}
+
+export interface SubjectCentroid {
+  subjectId: number;
+  meanRef: number;
+  meanDev: number;
+  meanDiff: number;
+  count: number;
+}
+
+export interface AnovaVarianceDecomposition {
+  ssBetween: number;
+  ssWithin: number;
+  msBetween: number;
+  msWithin: number;
+  sdBetween: number;
+  sdWithin: number;
+  sdTotal: number;
+  icc: number;
+  designEffect: number;
+  nEffective: number;
+  seCluster: number;
+  seNaive: number;
+  seUnderstatementRatio: number;
+}
+
+export interface AgreementMetrics {
+  m: number;
+  k: number;
+  totalN: number;
+  meanBias: number;
+  ciBiasClusterLow: number;
+  ciBiasClusterHigh: number;
+  ciBiasNaiveLow: number;
+  ciBiasNaiveHigh: number;
+  loaLower: number;
+  loaUpper: number;
+  arms: number;
+  mae: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p95: number;
+  p99: number;
+  coverageAtTolerance: number;
+  survivalAtTolerance: number;
+  variance: AnovaVarianceDecomposition;
+}
+
+export interface SurvivalPoint {
+  threshold: number;
+  empiricalSurvival: number; // P(|error| > x)
+  empiricalCoverage: number; // P(|error| <= x)
+  gaussianSurvival: number;
+  gaussianCoverage: number;
+  heavyTailExcess: number; // Difference showing heavy tails
+}
+
+export interface ScorecardItem {
+  id: string;
+  lens: 'product' | 'engineering' | 'clinical';
+  label: string;
+  value: string;
+  target: string;
+  status: 'pass' | 'caution' | 'fail';
+  verdict: string;
+  explanation: string;
+}
+
+/**
+ * Deterministic PRNG using Mulberry32 for reproducible synthetic simulation.
+ */
+function createMulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (t >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Standard Normal variate using Box-Muller transform.
+ */
+function randomNormal(rand: () => number): number {
+  const u1 = Math.max(1e-15, rand());
+  const u2 = rand();
+  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+}
+
+/**
+ * Laplace variate for generating heavy-tailed sensor error spikes.
+ */
+function randomLaplace(rand: () => number, scale: number): number {
+  const u = rand() - 0.5;
+  return -scale * Math.sign(u) * Math.log(1.0 - 2.0 * Math.abs(u));
+}
+
+/**
+ * Simulates a paired repeated-measures validation dataset reflecting the
+ * true hierarchical data-generating process:
+ *   Y_{ij,ref} ~ Uniform/Reference
+ *   u_i ~ Normal(0, sigma_b^2) (between-subject random intercept)
+ *   epsilon_{ij} ~ Normal(0, sigma_w^2) + intermittent heavy-tailed Laplace spike
+ *   Y_{ij,dev} = Y_{ij,ref} + trueBias + u_i + epsilon_{ij}
+ */
+export function generateSyntheticPairedData(params: {
+  m: number;
+  k: number;
+  bias: number;
+  sdB: number;
+  sdW: number;
+  outlierRate: number;
+  outlierScale: number;
+  seed?: number;
+  refRange?: [number, number];
+}): {
+  observations: PairedObservation[];
+  centroids: SubjectCentroid[];
+} {
+  const {
+    m,
+    k,
+    bias,
+    sdB,
+    sdW,
+    outlierRate,
+    outlierScale,
+    seed = 42,
+    refRange = [70, 98],
+  } = params;
+
+  const rand = createMulberry32(seed);
+  const observations: PairedObservation[] = [];
+  const centroids: SubjectCentroid[] = [];
+
+  const [refMin, refMax] = refRange;
+
+  for (let i = 1; i <= m; i += 1) {
+    // Subject-level random trait offset (e.g. skin tone, anatomical impedance)
+    const subjectEffect = sdB > 0 ? randomNormal(rand) * sdB : 0;
+    let sumRef = 0;
+    let sumDev = 0;
+    let sumDiff = 0;
+
+    for (let j = 1; j <= k; j += 1) {
+      // Replicate reference point across physiological domain
+      const baseRef = refMin + rand() * (refMax - refMin);
+      const isOutlier = rand() < outlierRate;
+      const withinNoise = sdW > 0 ? randomNormal(rand) * sdW : 0;
+      const outlierNoise = isOutlier ? randomLaplace(rand, outlierScale) : 0;
+
+      const totalDiff = bias + subjectEffect + withinNoise + outlierNoise;
+      const devVal = baseRef + totalDiff;
+
+      observations.push({
+        id: `s${i}-r${j}`,
+        subjectId: i,
+        obsIndex: j,
+        refValue: Number(baseRef.toFixed(2)),
+        devValue: Number(devVal.toFixed(2)),
+        diff: Number(totalDiff.toFixed(2)),
+        absDiff: Number(Math.abs(totalDiff).toFixed(2)),
+        isOutlier,
+      });
+
+      sumRef += baseRef;
+      sumDev += devVal;
+      sumDiff += totalDiff;
+    }
+
+    centroids.push({
+      subjectId: i,
+      meanRef: Number((sumRef / k).toFixed(2)),
+      meanDev: Number((sumDev / k).toFixed(2)),
+      meanDiff: Number((sumDiff / k).toFixed(2)),
+      count: k,
+    });
+  }
+
+  return { observations, centroids };
+}
+
+/**
+ * Computes one-way random effects ANOVA variance components, Intraclass Correlation,
+ * and Bland-Altman clustered agreement metrics from paired observations.
+ */
+export function computeAgreementMetrics(
+  observations: PairedObservation[],
+  toleranceWindow: number,
+  confidenceLevel: number = 0.95,
+): AgreementMetrics {
+  const totalN = observations.length;
+  if (totalN === 0) {
+    throw new Error('Observations array cannot be empty');
+  }
+
+  // Group differences by subject
+  const subjectMap = new Map<number, number[]>();
+  let sumDiff = 0;
+  let sumDiffSq = 0;
+  let sumAbsDiff = 0;
+
+  for (const obs of observations) {
+    sumDiff += obs.diff;
+    sumDiffSq += obs.diff * obs.diff;
+    sumAbsDiff += obs.absDiff;
+
+    const list = subjectMap.get(obs.subjectId) ?? [];
+    list.push(obs.diff);
+    subjectMap.set(obs.subjectId, list);
+  }
+
+  const m = subjectMap.size;
+  const k = totalN / m;
+  const grandMean = sumDiff / totalN;
+
+  // Between-subject sum of squares
+  let ssBetween = 0;
+  for (const [, diffs] of subjectMap) {
+    const subjMean = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+    ssBetween += diffs.length * Math.pow(subjMean - grandMean, 2);
+  }
+
+  // Within-subject sum of squares
+  let ssWithin = 0;
+  for (const [, diffs] of subjectMap) {
+    const subjMean = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+    for (const d of diffs) {
+      ssWithin += Math.pow(d - subjMean, 2);
+    }
+  }
+
+  const dfBetween = Math.max(1, m - 1);
+  const dfWithin = Math.max(1, totalN - m);
+
+  const msBetween = ssBetween / dfBetween;
+  const msWithin = ssWithin / dfWithin;
+
+  const sdWithin = Math.sqrt(Math.max(0, msWithin));
+  const sdBetween = Math.sqrt(Math.max(0, (msBetween - msWithin) / k));
+  const sdTotal = Math.sqrt(sdBetween * sdBetween + sdWithin * sdWithin);
+
+  const icc = sdTotal > 0 ? (sdBetween * sdBetween) / (sdTotal * sdTotal) : 0;
+  const designEffect = 1 + (k - 1) * icc;
+  const nEffective = designEffect > 0 ? totalN / designEffect : totalN;
+
+  // Clustered standard error of the mean bias vs naive pooled standard error
+  // Aligns with agreekit: var_mean = var_between * sum(counts^2)/N^2 + ms_within/N
+  // For balanced k: sdBetween^2 / m + sdWithin^2 / totalN. Handles sample MSB < MSW consistently.
+  const varMean = m > 0 ? (sdBetween * sdBetween) / m + (sdWithin * sdWithin) / totalN : msWithin / totalN;
+  const seCluster = Math.sqrt(Math.max(1e-12, varMean));
+  const seNaive = sdTotal / Math.sqrt(totalN);
+  const seUnderstatementRatio = seNaive > 0 ? seCluster / seNaive : 1.0;
+
+  // Student-t critical value for clustered degrees of freedom (m - 1)
+  const alpha = 1.0 - confidenceLevel;
+  const tCrit = studentT.ppf(1.0 - alpha / 2.0, dfBetween);
+  const zCrit = normal.ppf(1.0 - alpha / 2.0);
+
+  const ciBiasClusterLow = grandMean - tCrit * seCluster;
+  const ciBiasClusterHigh = grandMean + tCrit * seCluster;
+
+  const ciBiasNaiveLow = grandMean - zCrit * seNaive;
+  const ciBiasNaiveHigh = grandMean + zCrit * seNaive;
+
+  // Limits of Agreement: grandMean +/- 1.96 * sdTotal
+  const loaMultiplier = 1.959963984540054;
+  const loaLower = grandMean - loaMultiplier * sdTotal;
+  const loaUpper = grandMean + loaMultiplier * sdTotal;
+
+  // Root Mean Square Error (Arms) and MAE
+  const arms = Math.sqrt(sumDiffSq / totalN);
+  const mae = sumAbsDiff / totalN;
+
+  // Percentiles of absolute error
+  const sortedAbsDiffs = observations.map((o) => o.absDiff).sort((a, b) => a - b);
+  const getPercentile = (pct: number) => {
+    const idx = (pct / 100) * (sortedAbsDiffs.length - 1);
+    const low = Math.floor(idx);
+    const high = Math.ceil(idx);
+    const weight = idx - low;
+    return sortedAbsDiffs[low]! * (1 - weight) + sortedAbsDiffs[high]! * weight;
+  };
+
+  const p50 = getPercentile(50);
+  const p75 = getPercentile(75);
+  const p90 = getPercentile(90);
+  const p95 = getPercentile(95);
+  const p99 = getPercentile(99);
+
+  // Empirical coverage and survival at tolerance
+  const countInside = observations.filter((o) => o.absDiff <= toleranceWindow).length;
+  const coverageAtTolerance = (countInside / totalN) * 100;
+  const survivalAtTolerance = 100 - coverageAtTolerance;
+
+  return {
+    m,
+    k,
+    totalN,
+    meanBias: grandMean,
+    ciBiasClusterLow,
+    ciBiasClusterHigh,
+    ciBiasNaiveLow,
+    ciBiasNaiveHigh,
+    loaLower,
+    loaUpper,
+    arms,
+    mae,
+    p50,
+    p75,
+    p90,
+    p95,
+    p99,
+    coverageAtTolerance,
+    survivalAtTolerance,
+    variance: {
+      ssBetween,
+      ssWithin,
+      msBetween,
+      msWithin,
+      sdBetween,
+      sdWithin,
+      sdTotal,
+      icc,
+      designEffect,
+      nEffective,
+      seCluster,
+      seNaive,
+      seUnderstatementRatio,
+    },
+  };
+}
+
+/**
+ * Computes the "Survival of Error" curve P(|error| > x) and "Error Coverage" P(|error| <= x)
+ * along with the theoretical Gaussian curve from identical RMS spread.
+ *
+ * This explicitly exposes the "Heavy-Tail Hazard": in sensor validation, device errors
+ * frequently exhibit non-Gaussian kurtosis (motion artifacts, poor contact, arrhythmia).
+ * At high clinical thresholds, empirical survival can be 3x to 10x higher than what
+ * Gaussian-assuming Bland-Altman statistics predict!
+ */
+export function computeSurvivalCurve(
+  observations: PairedObservation[],
+  meanBias: number,
+  sdTotal: number,
+  maxThreshold?: number,
+  numSteps: number = 40,
+): SurvivalPoint[] {
+  const totalN = observations.length;
+  if (totalN === 0) return [];
+
+  const maxObs = observations.length > 0 ? Math.max(...observations.map((o) => o.absDiff)) : 0;
+  const upper = Math.max(maxThreshold ?? 0, Math.ceil(maxObs * 1.05), 1.0);
+  const step = upper / numSteps;
+
+  const points: SurvivalPoint[] = [];
+
+  for (let stepIdx = 0; stepIdx <= numSteps; stepIdx += 1) {
+    const x = stepIdx * step;
+    const countAbove = observations.filter((o) => o.absDiff > x).length;
+    const empiricalSurvival = (countAbove / totalN) * 100;
+    const roundedSurvival = Number(empiricalSurvival.toFixed(1));
+    const roundedCoverage = Number((100 - roundedSurvival).toFixed(1));
+
+    // Theoretical folded normal survival: P(|D| > x) where D ~ N(meanBias, sdTotal^2)
+    // P(D > x) + P(D < -x)
+    let gaussianSurvival = 0;
+    if (sdTotal > 0) {
+      const zUpper = (x - meanBias) / sdTotal;
+      const zLower = (-x - meanBias) / sdTotal;
+      const probUpper = normal.sf(zUpper);
+      const probLower = normal.cdf(zLower);
+      gaussianSurvival = Math.min(100, Math.max(0, (probUpper + probLower) * 100));
+    } else {
+      gaussianSurvival = Math.abs(meanBias) > x ? 100 : 0;
+    }
+    const roundedGaussSurvival = Number(gaussianSurvival.toFixed(1));
+    const roundedGaussCoverage = Number((100 - roundedGaussSurvival).toFixed(1));
+    const heavyTailExcess = Math.max(0, roundedSurvival - roundedGaussSurvival);
+
+    points.push({
+      threshold: Number(x.toFixed(2)),
+      empiricalSurvival: roundedSurvival,
+      empiricalCoverage: roundedCoverage,
+      gaussianSurvival: roundedGaussSurvival,
+      gaussianCoverage: roundedGaussCoverage,
+      heavyTailExcess: Number(heavyTailExcess.toFixed(1)),
+    });
+  }
+
+  return points;
+}
+
+/**
+ * Builds the Multi-Tier Executive Scorecard for cross-functional stakeholders.
+ */
+export function generateExecutiveScorecard(
+  metrics: AgreementMetrics,
+  preset: ReportStudioPreset,
+  toleranceWindow: number,
+): ScorecardItem[] {
+  const items: ScorecardItem[] = [];
+
+  // Product Lens: User-Facing Error Experience & Clinical Gate
+  const userCoverageStatus =
+    metrics.coverageAtTolerance >= preset.targetCoveragePct
+      ? 'pass'
+      : metrics.coverageAtTolerance >= preset.targetCoveragePct - 5
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'prod-coverage',
+    lens: 'product',
+    label: `Error Coverage Within ±${toleranceWindow} ${preset.unit}`,
+    value: `${metrics.coverageAtTolerance.toFixed(1)}%`,
+    target: `≥ ${preset.targetCoveragePct.toFixed(0)}%`,
+    status: userCoverageStatus,
+    verdict:
+      userCoverageStatus === 'pass'
+        ? 'Target Met: High User Reliability'
+        : userCoverageStatus === 'caution'
+          ? 'Borderline: Outlier Risk Under Dynamic Conditions'
+          : 'Failed: Unacceptable Proportion of Off-Target Readings',
+    explanation: `${(100 - metrics.coverageAtTolerance).toFixed(1)}% of user measurements experience absolute errors exceeding the ${toleranceWindow} ${preset.unit} clinical tolerance window.`,
+  });
+
+  const p95Status =
+    metrics.p95 <= preset.p95Target
+      ? 'pass'
+      : metrics.p95 <= preset.p95Target * 1.2
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'prod-p95',
+    lens: 'product',
+    label: '95th Percentile Error (P95)',
+    value: `±${metrics.p95.toFixed(2)} ${preset.unit}`,
+    target: `≤ ${preset.p95Target.toFixed(2)} ${preset.unit}`,
+    status: p95Status,
+    verdict:
+      p95Status === 'pass'
+        ? 'Bound Acceptable for Daily Use'
+        : p95Status === 'caution'
+          ? 'Elevated Tail Errors'
+          : 'High Severity Tail Spikes',
+    explanation: `95% of all measurements stay within ${metrics.p95.toFixed(2)} ${preset.unit}. Tail performance drives negative customer reviews and safety incidents.`,
+  });
+
+  // Engineering / Algorithm Lens: Calibration & Variance Decomposition
+  const biasAbs = Math.abs(metrics.meanBias);
+  const biasStatus =
+    biasAbs <= toleranceWindow * 0.2
+      ? 'pass'
+      : biasAbs <= toleranceWindow * 0.4
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'eng-bias',
+    lens: 'engineering',
+    label: 'Mean Systemic Bias (Clustered CI)',
+    value: `${metrics.meanBias >= 0 ? '+' : ''}${metrics.meanBias.toFixed(2)} ${preset.unit}`,
+    target: `CI within ±${(toleranceWindow * 0.3).toFixed(1)} ${preset.unit}`,
+    status: biasStatus,
+    verdict:
+      biasStatus === 'pass'
+        ? 'Zero-Calibration Stable'
+        : biasStatus === 'caution'
+          ? 'Mild Offset Detected'
+          : 'Systematic Sensor Offset',
+    explanation: `Clustered 95% CI is [${metrics.ciBiasClusterLow.toFixed(2)}, ${metrics.ciBiasClusterHigh.toFixed(2)}]. Naive pooled CI would falsely claim [${metrics.ciBiasNaiveLow.toFixed(2)}, ${metrics.ciBiasNaiveHigh.toFixed(2)}], understating uncertainty by ${metrics.variance.seUnderstatementRatio.toFixed(1)}x.`,
+  });
+
+  const iccStatus =
+    metrics.variance.icc < 0.4
+      ? 'pass'
+      : metrics.variance.icc < 0.7
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'eng-variance-decomp',
+    lens: 'engineering',
+    label: 'Between-Subject Variance Share (ICC)',
+    value: `${(metrics.variance.icc * 100).toFixed(1)}% (ICC = ${metrics.variance.icc.toFixed(2)})`,
+    target: 'ICC < 0.50 preferred',
+    status: iccStatus,
+    verdict:
+      iccStatus === 'pass'
+        ? 'Errors Driven by Noise, Not Physiology'
+        : iccStatus === 'caution'
+          ? 'Moderate Subject-Level Calibration Drift'
+          : 'High Demographic / Skin Tone Disparity Risk',
+    explanation: `Between-subject SD is ${metrics.variance.sdBetween.toFixed(2)} vs within-subject SD of ${metrics.variance.sdWithin.toFixed(2)}. High ICC signals that algorithm tuning varies across physical bodies.`,
+  });
+
+  const effSizeRatio = metrics.variance.nEffective / metrics.totalN;
+  items.push({
+    id: 'eng-neff',
+    lens: 'engineering',
+    label: 'Effective Sample Size (N_eff / N_total)',
+    value: `${metrics.variance.nEffective.toFixed(0)} of ${metrics.totalN} paired obs`,
+    target: 'Design Effect penalty transparent',
+    status: effSizeRatio > 0.5 ? 'pass' : 'caution',
+    verdict: `${(effSizeRatio * 100).toFixed(0)}% Information Efficiency`,
+    explanation: `Due to subject clustering (Design Effect = ${metrics.variance.designEffect.toFixed(2)}), ${metrics.totalN} observations only yield ${metrics.variance.nEffective.toFixed(0)} independent statistical degrees of freedom.`,
+  });
+
+  // Clinical & Regulatory Lens: Compliance & Limits of Agreement
+  const armsStatus =
+    metrics.arms <= preset.armsTarget
+      ? 'pass'
+      : metrics.arms <= preset.armsTarget * 1.15
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'clin-arms',
+    lens: 'clinical',
+    label: 'Root Mean Square Error / Arms',
+    value: `${metrics.arms.toFixed(2)} ${preset.unit}`,
+    target: `≤ ${preset.armsTarget.toFixed(2)} ${preset.unit} (${preset.regulatoryStandard.split('/')[0]?.trim() ?? 'Standard'})`,
+    status: armsStatus,
+    verdict:
+      armsStatus === 'pass'
+        ? 'Meets Regulatory Threshold'
+        : armsStatus === 'caution'
+          ? 'Borderline Compliance Margin'
+          : 'Fails Regulatory Requirement',
+    explanation: `Root Mean Square Error (Arms) is the primary FDA and ISO criterion for continuous physiological monitors.`,
+  });
+
+  const loaWidth = (metrics.loaUpper - metrics.loaLower) / 2;
+  const loaStatus =
+    loaWidth <= toleranceWindow * 1.25
+      ? 'pass'
+      : loaWidth <= toleranceWindow * 1.6
+        ? 'caution'
+        : 'fail';
+
+  items.push({
+    id: 'clin-loa',
+    lens: 'clinical',
+    label: '95% Limits of Agreement (LoA)',
+    value: `[${metrics.loaLower.toFixed(2)}, +${metrics.loaUpper.toFixed(2)}] ${preset.unit}`,
+    target: `Span ≤ ±${(toleranceWindow * 1.3).toFixed(1)} ${preset.unit}`,
+    status: loaStatus,
+    verdict:
+      loaStatus === 'pass'
+        ? 'Agreement Bounds Clinically Acceptable'
+        : loaStatus === 'caution'
+          ? 'Wide Limits: Monitor Borderline Cases'
+          : 'Excessive Discordance with Reference Method',
+    explanation: `95% of future pairwise differences will fall between ${metrics.loaLower.toFixed(2)} and ${metrics.loaUpper.toFixed(2)} ${preset.unit}.`,
+  });
+
+  return items;
+}
+
+/**
+ * Generates a self-contained, zero-permission, portable HTML validation report.
+ * Inspired by Google infrastructure learnings where standalone HTML+JS / Plx dashboards
+ * proved the most effective medium to scale findings across corporate boundaries
+ * without triggering restrictive data permission locks.
+ */
+export function generateStandaloneHtmlReport(params: {
+  preset: ReportStudioPreset;
+  metrics: AgreementMetrics;
+  scorecard: ScorecardItem[];
+  survivalCurve: SurvivalPoint[];
+  toleranceWindow: number;
+  observations?: PairedObservation[];
+  centroids?: SubjectCentroid[];
+}): string {
+  const {
+    preset,
+    metrics,
+    scorecard,
+    survivalCurve,
+    toleranceWindow,
+    observations = [],
+    centroids = [],
+  } = params;
+  const timestamp = new Date().toISOString().split('T')[0];
+
+  // SVG Chart 1: Bland-Altman Agreement Chart
+  const baW = 760;
+  const baH = 340;
+  const baPad = { top: 25, right: 35, bottom: 45, left: 60 };
+  const baInnerW = baW - baPad.left - baPad.right;
+  const baInnerH = baH - baPad.top - baPad.bottom;
+
+  let xMinRef = 70;
+  let xMaxRef = 100;
+  if (observations.length > 0) {
+    const refs = observations.map((o) => o.refValue);
+    xMinRef = Math.floor(Math.min(...refs) * 0.98);
+    xMaxRef = Math.ceil(Math.max(...refs) * 1.02);
+  } else if (centroids.length > 0) {
+    const refs = centroids.map((c) => c.meanRef);
+    xMinRef = Math.floor(Math.min(...refs) * 0.98);
+    xMaxRef = Math.ceil(Math.max(...refs) * 1.02);
+  }
+  if (xMaxRef <= xMinRef) xMaxRef = xMinRef + 10;
+
+  const yMinBa = Math.floor(Math.min(metrics.loaLower, -toleranceWindow) * 1.25);
+  const yMaxBa = Math.ceil(Math.max(metrics.loaUpper, toleranceWindow) * 1.25);
+  const safeYMaxBa = yMaxBa <= yMinBa ? yMinBa + 2 : yMaxBa;
+
+  const baXToPx = (val: number) =>
+    baPad.left + ((val - xMinRef) / (xMaxRef - xMinRef)) * baInnerW;
+  const baYToPx = (val: number) =>
+    baPad.top + baInnerH - ((val - yMinBa) / (safeYMaxBa - yMinBa)) * baInnerH;
+
+  const tolYTop = Math.max(baPad.top, baYToPx(toleranceWindow));
+  const tolYBot = Math.min(baPad.top + baInnerH, baYToPx(-toleranceWindow));
+  const tolHeight = Math.max(2, tolYBot - tolYTop);
+  const biasYPx = baYToPx(metrics.meanBias);
+  const loaUpperYPx = baYToPx(metrics.loaUpper);
+  const loaLowerYPx = baYToPx(metrics.loaLower);
+
+  const obsSvgCircles = observations
+    .map(
+      (o) =>
+        `<circle cx="${baXToPx(o.refValue).toFixed(1)}" cy="${baYToPx(o.diff).toFixed(
+          1,
+        )}" r="3.5" fill="#0284c7" fill-opacity="0.65" stroke="#ffffff" stroke-width="0.5" class="ba-obs"><title>Subject ${o.subjectId}: Ref ${o.refValue} ${preset.unit}, Diff ${o.diff >= 0 ? '+' : ''}${o.diff} ${preset.unit}</title></circle>`,
+    )
+    .join('');
+
+  const centroidSvgDiamonds = centroids
+    .map((c) => {
+      const cx = baXToPx(c.meanRef);
+      const cy = baYToPx(c.meanDiff);
+      const size = 5.5;
+      const pts = `${cx.toFixed(1)},${(cy - size).toFixed(1)} ${(cx + size).toFixed(
+        1,
+      )},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy + size).toFixed(1)} ${(
+        cx - size
+      ).toFixed(1)},${cy.toFixed(1)}`;
+      return `<polygon points="${pts}" fill="#d97706" stroke="#ffffff" stroke-width="0.8" class="ba-cent"><title>Subject ${c.subjectId} Centroid: Mean Ref ${c.meanRef} ${preset.unit}, Mean Diff ${c.meanDiff >= 0 ? '+' : ''}${c.meanDiff} ${preset.unit} (${c.count} reps)</title></polygon>`;
+    })
+    .join('');
+
+  // SVG Chart 2: Survival of Error & Coverage Curves
+  const survW = 760;
+  const survH = 300;
+  const survPad = { top: 25, right: 35, bottom: 45, left: 60 };
+  const survInnerW = survW - survPad.left - survPad.right;
+  const survInnerH = survH - survPad.top - survPad.bottom;
+
+  const maxThreshold =
+    survivalCurve.length > 0 ? survivalCurve[survivalCurve.length - 1]!.threshold : 10;
+  const safeMaxThresh = maxThreshold > 0 ? maxThreshold : 10;
+
+  const survXToPx = (x: number) =>
+    survPad.left + (x / safeMaxThresh) * survInnerW;
+  const survYToPx = (pct: number) =>
+    survPad.top + survInnerH - (pct / 100) * survInnerH;
+
+  const empSurvD = survivalCurve
+    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${survXToPx(p.threshold).toFixed(1)} ${survYToPx(p.empiricalSurvival).toFixed(1)}`)
+    .join(' ');
+
+  const gaussSurvD = survivalCurve
+    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${survXToPx(p.threshold).toFixed(1)} ${survYToPx(p.gaussianSurvival).toFixed(1)}`)
+    .join(' ');
+
+  const empCovD = survivalCurve
+    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${survXToPx(p.threshold).toFixed(1)} ${survYToPx(p.empiricalCoverage).toFixed(1)}`)
+    .join(' ');
+
+  const tolSurvXPx = survXToPx(toleranceWindow);
+  const p95SurvXPx = survXToPx(metrics.p95);
+
+  const scorecardRows = scorecard
+    .map(
+      (item) => `
+      <tr class="scorecard-row" data-lens="${item.lens}" style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 10px 12px; font-weight: 600; text-transform: capitalize; color: #4b5563;">${item.lens}</td>
+        <td style="padding: 10px 12px; font-weight: 500; color: #111827;">${item.label}</td>
+        <td style="padding: 10px 12px; font-family: monospace; font-size: 14px; font-weight: 700; color: #0f172a;">${item.value}</td>
+        <td style="padding: 10px 12px; color: #6b7280; font-size: 13px;">${item.target}</td>
+        <td style="padding: 10px 12px;">
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 700; ${
+            item.status === 'pass'
+              ? 'background-color: #dcfce7; color: #166534;'
+              : item.status === 'caution'
+                ? 'background-color: #fef3c7; color: #92400e;'
+                : 'background-color: #fee2e2; color: #991b1b;'
+          }">${item.status.toUpperCase()}</span>
+        </td>
+        <td style="padding: 10px 12px; font-size: 13px; color: #374151;">${item.explanation}</td>
+      </tr>`,
+    )
+    .join('');
+
+  // Sleep staging confusion matrix HTML if present
+  let sleepSectionHtml = '';
+  if (preset.sleepSummary) {
+    const sm = preset.sleepSummary;
+    const headerCols = sm.classes.map((cls) => `<th style="text-align: right; padding: 8px 10px;">${cls}</th>`).join('');
+    const rowsHtml = sm.matrix
+      .map((row, rIdx) => {
+        const clsName = sm.classes[rIdx]!;
+        const stat = sm.stageMetrics[rIdx]!;
+        const cells = row
+          .map(
+            (c, cIdx) =>
+              `<td style="padding: 8px 10px; font-family: monospace; text-align: right; ${
+                rIdx === cIdx ? 'background-color: #eff6ff; font-weight: 700; color: #1d4ed8;' : 'color: #4b5563;'
+              }">${c.toLocaleString()}</td>`,
+          )
+          .join('');
+        return `
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 8px 10px; font-weight: 600; color: #111827;">${clsName}</td>
+            ${cells}
+            <td style="padding: 8px 10px; font-family: monospace; text-align: right; font-weight: 700; color: #16a34a;">${(stat.sensitivity * 100).toFixed(1)}%</td>
+            <td style="padding: 8px 10px; font-family: monospace; text-align: right; color: #4b5563;">${(stat.specificity * 100).toFixed(1)}%</td>
+            <td style="padding: 8px 10px; font-family: monospace; text-align: right; color: #4b5563;">${(stat.ppv * 100).toFixed(1)}%</td>
+          </tr>`;
+      })
+      .join('');
+
+    sleepSectionHtml = `
+      <h2 class="section-title">4. Sleep Staging Multi-Class Concordance (SRI Framework)</h2>
+      <p style="font-size: 14px; color: #4b5563;">
+        30-second epoch-by-epoch (EBE) agreement evaluated against Polysomnography (PSG).
+        Overall Concordance: <strong>${(sm.overallAccuracy * 100).toFixed(1)}%</strong> &bull;
+        Cohen's Kappa (&kappa;): <strong>${sm.cohensKappa.toFixed(3)}</strong> &bull;
+        Total Sleep Time Bias: <strong>${sm.tstBiasMinutes} min</strong> (95% LoA: [${sm.tstLoaMinutes[0]} min, +${sm.tstLoaMinutes[1]} min]).
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>True PSG \\ Device</th>
+            ${headerCols}
+            <th style="text-align: right; padding: 8px 10px;">Sensitivity</th>
+            <th style="text-align: right; padding: 8px 10px;">Specificity</th>
+            <th style="text-align: right; padding: 8px 10px;">PPV</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Validation Findings Studio Report - ${preset.name}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1f2937; margin: 0; padding: 24px; background: #f9fafb; }
+    .container { max-width: 1040px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; padding: 32px; }
+    h1 { font-size: 24px; font-weight: 700; margin-top: 0; color: #111827; }
+    .badge { display: inline-block; padding: 4px 10px; background: #e0f2fe; color: #0369a1; border-radius: 9999px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+    .meta-box { background: #f3f4f6; border-radius: 8px; padding: 16px; margin: 16px 0 24px 0; font-size: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .meta-item strong { display: block; font-size: 11px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #4b5563; }
+    .section-title { font-size: 18px; font-weight: 600; margin-top: 36px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; color: #111827; }
+    .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; font-size: 13px; color: #1e40af; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .filter-btn-group { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+    .filter-btn { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.15s ease; }
+    .filter-btn:hover { background: #e5e7eb; color: #111827; }
+    .filter-btn.active { background: #0f172a; color: #ffffff; border-color: #0f172a; }
+    .chart-container { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+    .chart-title { font-size: 14px; font-weight: 600; color: #111827; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #4b5563; margin-right: 14px; }
+    .legend-line { display: inline-block; width: 14px; height: 3px; }
+    .legend-line.dashed { border-top: 2px dashed #94a3b8; height: 0; }
+    .legend-box { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+    svg text { user-select: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">Validation Report Studio Artifact</span>
+    <h1>Validation Findings &amp; Hierarchical Model Report: ${preset.name}</h1>
+    <p style="color: #4b5563; margin-top: -4px;">Generated on ${timestamp} &bull; Standalone Zero-Permission Client Report with Interactive JavaScript</p>
+
+    <div class="meta-box">
+      <div class="meta-item"><strong>Domain / Protocol</strong>${preset.domain}</div>
+      <div class="meta-item"><strong>Regulatory Standard</strong>${preset.regulatoryStandard}</div>
+      <div class="meta-item"><strong>Sample Architecture</strong>${metrics.m} subjects &times; ${metrics.k} replicates (${metrics.totalN} paired obs)</div>
+      <div class="meta-item"><strong>Effective Sample Size</strong>${metrics.variance.nEffective.toFixed(0)} independent obs (DEFF = ${metrics.variance.designEffect.toFixed(2)})</div>
+    </div>
+
+    <div class="note">
+      <strong>Zero-Permission Scaling Architecture:</strong> This report is self-contained and auditable without backend database access. In enterprise research environments (like Google's infra), standalone interactive HTML+JS or Plx dashboards remove permissions friction while educating stakeholders on the underlying hierarchical data structure.
+    </div>
+
+    <h2 class="section-title">1. Cross-Functional Executive Scorecard</h2>
+    <div class="filter-btn-group">
+      <button class="filter-btn active" onclick="filterScorecard('all', this)">All Lenses</button>
+      <button class="filter-btn" onclick="filterScorecard('product', this)">Product &amp; Executive</button>
+      <button class="filter-btn" onclick="filterScorecard('engineering', this)">Algorithm &amp; Engineering</button>
+      <button class="filter-btn" onclick="filterScorecard('clinical', this)">Clinical &amp; Regulatory</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Lens</th>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Target</th>
+          <th>Status</th>
+          <th>Interpretation</th>
+        </tr>
+      </thead>
+      <tbody id="scorecard-body">
+        ${scorecardRows}
+      </tbody>
+    </table>
+
+    <h2 class="section-title">2. Hierarchical Variance Decomposition &amp; Clustering Penalty</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Value (${preset.unit})</th>
+          <th>Variance Share</th>
+          <th>Clinical &amp; Engineering Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 10px 12px; font-weight: 600;">Between-Subject Spread (&sigma;<sub>b</sub>)</td>
+          <td style="padding: 10px 12px; font-family: monospace;">${metrics.variance.sdBetween.toFixed(2)}</td>
+          <td style="padding: 10px 12px; font-weight: 600;">${(metrics.variance.icc * 100).toFixed(1)}%</td>
+          <td style="padding: 10px 12px; font-size: 13px;">Subject trait differences (pigmentation, perfusion, geometry). High &sigma;<sub>b</sub> implies algorithmic disparity across human demographics.</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 12px; font-weight: 600;">Within-Subject Spread (&sigma;<sub>w</sub>)</td>
+          <td style="padding: 10px 12px; font-family: monospace;">${metrics.variance.sdWithin.toFixed(2)}</td>
+          <td style="padding: 10px 12px; font-weight: 600;">${((1 - metrics.variance.icc) * 100).toFixed(1)}%</td>
+          <td style="padding: 10px 12px; font-size: 13px;">Sensor noise, contact impedance, and temporal fluctuations within the same participant.</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 12px; font-weight: 600;">Total Agreement Spread (&sigma;<sub>total</sub>)</td>
+          <td style="padding: 10px 12px; font-family: monospace;">${metrics.variance.sdTotal.toFixed(2)}</td>
+          <td style="padding: 10px 12px; font-weight: 600;">100%</td>
+          <td style="padding: 10px 12px; font-size: 13px;">Bland-Altman 95% LoA span = &plusmn;${(1.96 * metrics.variance.sdTotal).toFixed(2)} ${preset.unit}. Effective sample size: ${metrics.variance.nEffective.toFixed(0)} of ${metrics.totalN}.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 class="section-title">3. Bland-Altman Agreement Chart with Subject-Level Clustering</h2>
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">Bland-Altman Plot: Difference vs Reference (${preset.unit})</span>
+        <div class="filter-btn-group" style="margin: 0;">
+          <button class="filter-btn active" id="btn-ba-all" onclick="setBaView('all')">All Observations (${metrics.totalN})</button>
+          <button class="filter-btn" id="btn-ba-cent" onclick="setBaView('centroids')">${metrics.m} Subject Centroids</button>
+        </div>
+      </div>
+      <div style="width: 100%; overflow-x: auto;">
+        <svg viewBox="0 0 ${baW} ${baH}" width="100%" height="auto" style="display: block; font-family: monospace; font-size: 11px;">
+          <!-- Axes and Grid -->
+          <rect x="${baPad.left}" y="${baPad.top}" width="${baInnerW}" height="${baInnerH}" fill="#fcfcfd" stroke="#e5e7eb" />
+          <!-- Shaded clinical tolerance window -->
+          <rect x="${baPad.left}" y="${tolYTop.toFixed(1)}" width="${baInnerW}" height="${tolHeight.toFixed(1)}" fill="#10b981" fill-opacity="0.10" />
+          <text x="${baPad.left + 8}" y="${(tolYTop + 14).toFixed(1)}" fill="#059669" font-size="10" font-weight="600">+${toleranceWindow} ${preset.unit} Tolerance</text>
+          <text x="${baPad.left + 8}" y="${(tolYBot - 6).toFixed(1)}" fill="#059669" font-size="10" font-weight="600">-${toleranceWindow} ${preset.unit} Tolerance</text>
+
+          <!-- Mean Bias Line -->
+          <line x1="${baPad.left}" y1="${biasYPx.toFixed(1)}" x2="${baPad.left + baInnerW}" y2="${biasYPx.toFixed(1)}" stroke="#0284c7" stroke-width="2" />
+          <text x="${baPad.left + baInnerW - 6}" y="${(biasYPx - 6).toFixed(1)}" text-anchor="end" fill="#0284c7" font-weight="700">Bias: ${metrics.meanBias >= 0 ? '+' : ''}${metrics.meanBias.toFixed(2)}</text>
+
+          <!-- LoA Upper and Lower -->
+          <line x1="${baPad.left}" y1="${loaUpperYPx.toFixed(1)}" x2="${baPad.left + baInnerW}" y2="${loaUpperYPx.toFixed(1)}" stroke="#64748b" stroke-dasharray="4,4" stroke-width="1.5" />
+          <text x="${baPad.left + baInnerW - 6}" y="${(loaUpperYPx - 5).toFixed(1)}" text-anchor="end" fill="#64748b">+95% LoA: +${metrics.loaUpper.toFixed(2)}</text>
+
+          <line x1="${baPad.left}" y1="${loaLowerYPx.toFixed(1)}" x2="${baPad.left + baInnerW}" y2="${loaLowerYPx.toFixed(1)}" stroke="#64748b" stroke-dasharray="4,4" stroke-width="1.5" />
+          <text x="${baPad.left + baInnerW - 6}" y="${(loaLowerYPx + 14).toFixed(1)}" text-anchor="end" fill="#64748b">-95% LoA: ${metrics.loaLower.toFixed(2)}</text>
+
+          <!-- Zero reference line -->
+          <line x1="${baPad.left}" y1="${baYToPx(0).toFixed(1)}" x2="${baPad.left + baInnerW}" y2="${baYToPx(0).toFixed(1)}" stroke="#cbd5e1" stroke-width="1" />
+
+          <!-- Data Points -->
+          <g id="ba-all-group">${obsSvgCircles}</g>
+          <g id="ba-cent-group" style="display: none;">${centroidSvgDiamonds}</g>
+
+          <!-- Axes Labels -->
+          <text x="${baPad.left + baInnerW / 2}" y="${baH - 10}" text-anchor="middle" fill="#4b5563" font-size="12" font-family="-apple-system, sans-serif">Reference: ${preset.referenceName} (${preset.unit})</text>
+          <text x="18" y="${baPad.top + baInnerH / 2}" text-anchor="middle" fill="#4b5563" font-size="12" font-family="-apple-system, sans-serif" transform="rotate(-90 18 ${baPad.top + baInnerH / 2})">Difference: Device - Reference (${preset.unit})</text>
+        </svg>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: #6b7280; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span class="legend-item"><span class="legend-line" style="background: #0284c7;"></span>Mean Bias</span>
+          <span class="legend-item"><span class="legend-line dashed"></span>95% Limits of Agreement</span>
+          <span class="legend-item"><span class="legend-box" style="background: rgba(16, 185, 129, 0.2);"></span>Tolerance Window</span>
+        </div>
+        <span>Hover markers to inspect paired values</span>
+      </div>
+    </div>
+
+    <h2 class="section-title">4. Survival of Error (Tail Outlier Diagnostics)</h2>
+    <p style="font-size: 14px; color: #4b5563;">
+      Bland-Altman summaries assume a Gaussian distribution, concealing rare catastrophic spikes.
+      At tolerance threshold <strong>&plusmn;${toleranceWindow} ${preset.unit}</strong>:
+      Empirical Coverage: <strong>${metrics.coverageAtTolerance.toFixed(1)}%</strong> &bull;
+      Error Survival P(|error| &gt; ${toleranceWindow}): <strong>${metrics.survivalAtTolerance.toFixed(1)}%</strong> &bull;
+      95th Percentile Absolute Error (P95): <strong>&plusmn;${metrics.p95.toFixed(2)} ${preset.unit}</strong>.
+    </p>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">Survival of Error P(|Error| &gt; x) and Error Coverage P(|Error| &le; x)</span>
+      </div>
+      <div style="width: 100%; overflow-x: auto;">
+        <svg viewBox="0 0 ${survW} ${survH}" width="100%" height="auto" style="display: block; font-family: monospace; font-size: 11px;">
+          <!-- Axes and Grid -->
+          <rect x="${survPad.left}" y="${survPad.top}" width="${survInnerW}" height="${survInnerH}" fill="#fcfcfd" stroke="#e5e7eb" />
+
+          <!-- Horizontal Grid Lines at 25%, 50%, 75%, 100% -->
+          <line x1="${survPad.left}" y1="${survYToPx(25).toFixed(1)}" x2="${survPad.left + survInnerW}" y2="${survYToPx(25).toFixed(1)}" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="${survPad.left}" y1="${survYToPx(50).toFixed(1)}" x2="${survPad.left + survInnerW}" y2="${survYToPx(50).toFixed(1)}" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="${survPad.left}" y1="${survYToPx(75).toFixed(1)}" x2="${survPad.left + survInnerW}" y2="${survYToPx(75).toFixed(1)}" stroke="#f1f5f9" stroke-width="1" />
+          <text x="${survPad.left - 8}" y="${(survYToPx(0) + 4).toFixed(1)}" text-anchor="end" fill="#64748b">0%</text>
+          <text x="${survPad.left - 8}" y="${(survYToPx(50) + 4).toFixed(1)}" text-anchor="end" fill="#64748b">50%</text>
+          <text x="${survPad.left - 8}" y="${(survYToPx(100) + 4).toFixed(1)}" text-anchor="end" fill="#64748b">100%</text>
+
+          <!-- Vertical Tolerance Window Line -->
+          <line x1="${tolSurvXPx.toFixed(1)}" y1="${survPad.top}" x2="${tolSurvXPx.toFixed(1)}" y2="${survPad.top + survInnerH}" stroke="#10b981" stroke-dasharray="3,3" stroke-width="1.5" />
+          <text x="${(tolSurvXPx + 4).toFixed(1)}" y="${survPad.top + 16}" fill="#059669" font-weight="600" font-size="10">Tol (${toleranceWindow})</text>
+
+          <!-- Vertical P95 Line -->
+          <line x1="${p95SurvXPx.toFixed(1)}" y1="${survPad.top}" x2="${p95SurvXPx.toFixed(1)}" y2="${survPad.top + survInnerH}" stroke="#e11d48" stroke-dasharray="3,3" stroke-width="1.5" />
+          <text x="${(p95SurvXPx + 4).toFixed(1)}" y="${survPad.top + 32}" fill="#e11d48" font-weight="600" font-size="10">P95 (${metrics.p95.toFixed(1)})</text>
+
+          <!-- Curves -->
+          <!-- Gaussian Theoretical Survival (dashed grey) -->
+          <path d="${gaussSurvD}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4" />
+          <!-- Empirical Coverage (green) -->
+          <path d="${empCovD}" fill="none" stroke="#16a34a" stroke-width="2.5" />
+          <!-- Empirical Survival (red/rose) -->
+          <path d="${empSurvD}" fill="none" stroke="#e11d48" stroke-width="2.5" />
+
+          <!-- Axes Labels -->
+          <text x="${survPad.left + survInnerW / 2}" y="${survH - 10}" text-anchor="middle" fill="#4b5563" font-size="12" font-family="-apple-system, sans-serif">Absolute Error Threshold x (${preset.unit})</text>
+          <text x="18" y="${survPad.top + survInnerH / 2}" text-anchor="middle" fill="#4b5563" font-size="12" font-family="-apple-system, sans-serif" transform="rotate(-90 18 ${survPad.top + survInnerH / 2})">Probability (%)</text>
+        </svg>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: #6b7280; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span class="legend-item"><span class="legend-line" style="background: #e11d48;"></span>Empirical Survival P(|error| &gt; x)</span>
+          <span class="legend-item"><span class="legend-line" style="background: #16a34a;"></span>Empirical Coverage P(|error| &le; x)</span>
+          <span class="legend-item"><span class="legend-line dashed"></span>Gaussian Theoretical Survival</span>
+        </div>
+        <span>P50: ${metrics.p50.toFixed(2)} &bull; P90: ${metrics.p90.toFixed(2)} &bull; P95: ${metrics.p95.toFixed(2)} ${preset.unit}</span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Threshold (${preset.unit})</th>
+          <th>Empirical Survival P(|Error| &gt; x)</th>
+          <th>Empirical Coverage P(|Error| &le; x)</th>
+          <th>Gaussian Theoretical Survival</th>
+          <th>Heavy-Tail Excess</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${survivalCurve
+          .filter((_, idx) => idx % 4 === 0)
+          .map(
+            (sp) => `
+          <tr>
+            <td style="padding: 6px 12px; font-family: monospace;">${sp.threshold.toFixed(2)}</td>
+            <td style="padding: 6px 12px; font-weight: 600; color: #e11d48;">${sp.empiricalSurvival.toFixed(1)}%</td>
+            <td style="padding: 6px 12px; font-weight: 600; color: #16a34a;">${sp.empiricalCoverage.toFixed(1)}%</td>
+            <td style="padding: 6px 12px; color: #6b7280;">${sp.gaussianSurvival.toFixed(1)}%</td>
+            <td style="padding: 6px 12px; color: ${sp.heavyTailExcess > 0 ? '#d97706' : '#6b7280'}; font-weight: 600;">+${sp.heavyTailExcess.toFixed(1)}%</td>
+          </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>
+
+    ${sleepSectionHtml}
+
+    <div style="margin-top: 36px; border-top: 1px solid #e5e7eb; padding-top: 16px; font-size: 12px; color: #9ca3af; text-align: center;">
+      Validation Study Designer &bull; agreekit analytical methodology &bull; Standalone HTML+JavaScript Report
+    </div>
+  </div>
+
+  <script>
+    function filterScorecard(lens, btn) {
+      document.querySelectorAll(".filter-btn-group .filter-btn").forEach(function(b) {
+        if (b.parentElement === btn.parentElement) b.classList.remove("active");
+      });
+      btn.classList.add("active");
+      var rows = document.querySelectorAll(".scorecard-row");
+      rows.forEach(function(row) {
+        if (lens === "all" || row.getAttribute("data-lens") === lens) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+    }
+
+    function setBaView(view) {
+      var allGroup = document.getElementById("ba-all-group");
+      var centGroup = document.getElementById("ba-cent-group");
+      var btnAll = document.getElementById("btn-ba-all");
+      var btnCent = document.getElementById("btn-ba-cent");
+
+      if (view === "all") {
+        if (allGroup) allGroup.style.display = "";
+        if (centGroup) centGroup.style.display = "none";
+        if (btnAll) btnAll.classList.add("active");
+        if (btnCent) btnCent.classList.remove("active");
+      } else {
+        if (allGroup) allGroup.style.display = "none";
+        if (centGroup) centGroup.style.display = "";
+        if (btnAll) btnAll.classList.remove("active");
+        if (btnCent) btnCent.classList.add("active");
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
+/**
+ * Generates structured JSON summary suitable for Plx Dashboard / Looker / SQL ETL integration.
+ */
+export function generatePlxJsonSummary(params: {
+  preset: ReportStudioPreset;
+  metrics: AgreementMetrics;
+  scorecard: ScorecardItem[];
+  toleranceWindow: number;
+}): string {
+  const { preset, metrics, scorecard, toleranceWindow } = params;
+  return JSON.stringify(
+    {
+      reportType: 'validation_findings_studio_summary',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      presetId: preset.id,
+      presetName: preset.name,
+      domain: preset.domain,
+      standard: preset.regulatoryStandard,
+      toleranceWindow,
+      sampleArchitecture: {
+        subjects: metrics.m,
+        replicatesPerSubject: metrics.k,
+        totalPairedObservations: metrics.totalN,
+        effectiveSampleSize: Number(metrics.variance.nEffective.toFixed(1)),
+        designEffect: Number(metrics.variance.designEffect.toFixed(2)),
+      },
+      blandAltmanAgreement: {
+        meanBias: Number(metrics.meanBias.toFixed(3)),
+        ciBiasClustered: [
+          Number(metrics.ciBiasClusterLow.toFixed(3)),
+          Number(metrics.ciBiasClusterHigh.toFixed(3)),
+        ],
+        ciBiasNaive: [
+          Number(metrics.ciBiasNaiveLow.toFixed(3)),
+          Number(metrics.ciBiasNaiveHigh.toFixed(3)),
+        ],
+        seUnderstatementRatio: Number(metrics.variance.seUnderstatementRatio.toFixed(2)),
+        loaLower: Number(metrics.loaLower.toFixed(3)),
+        loaUpper: Number(metrics.loaUpper.toFixed(3)),
+        arms: Number(metrics.arms.toFixed(3)),
+        mae: Number(metrics.mae.toFixed(3)),
+      },
+      varianceDecomposition: {
+        sdBetween: Number(metrics.variance.sdBetween.toFixed(3)),
+        sdWithin: Number(metrics.variance.sdWithin.toFixed(3)),
+        sdTotal: Number(metrics.variance.sdTotal.toFixed(3)),
+        icc: Number(metrics.variance.icc.toFixed(3)),
+      },
+      survivalAndPercentiles: {
+        p50: Number(metrics.p50.toFixed(3)),
+        p75: Number(metrics.p75.toFixed(3)),
+        p90: Number(metrics.p90.toFixed(3)),
+        p95: Number(metrics.p95.toFixed(3)),
+        p99: Number(metrics.p99.toFixed(3)),
+        coverageAtTolerancePct: Number(metrics.coverageAtTolerance.toFixed(1)),
+        survivalAtTolerancePct: Number(metrics.survivalAtTolerance.toFixed(1)),
+      },
+      executiveScorecard: scorecard.map((s) => ({
+        id: s.id,
+        lens: s.lens,
+        label: s.label,
+        value: s.value,
+        target: s.target,
+        status: s.status,
+        verdict: s.verdict,
+      })),
+      sleepStaging: preset.sleepSummary
+        ? {
+            overallAccuracy: preset.sleepSummary.overallAccuracy,
+            cohensKappa: preset.sleepSummary.cohensKappa,
+            tstBiasMinutes: preset.sleepSummary.tstBiasMinutes,
+            tstLoaMinutes: preset.sleepSummary.tstLoaMinutes,
+          }
+        : undefined,
+    },
+    null,
+    2,
+  );
+}
