@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Activity,
   ArrowRight,
   Check,
   Copy,
@@ -9,6 +8,7 @@ import {
   ExternalLink,
   Layers,
   ShieldCheck,
+  Sliders,
   Sparkles,
   Terminal,
   Zap,
@@ -16,342 +16,648 @@ import {
 import { OpenWearableValidationLogo } from '../components/brand/OpenWearableValidationLogo.tsx';
 import { AgreekitLogo } from '../components/brand/AgreekitLogo.tsx';
 
-/**
- * Interactive Hero Biosensor Validation Stage
- *
- * Demonstrates real-time sensor waveform comparison: raw wrist PPG vs gold-standard ECG,
- * featuring an interactive motion artifact toggle and dynamic Bland-Altman caliper readouts.
- */
-function HeroValidationStage() {
-  const [hasMotion, setHasMotion] = useState(false);
+/* ============================================================================
+ * 1. HERO CENTERPIECE: CLINICAL BIOSENSOR VALIDATION INSTRUMENT
+ *    Authentic physiological validation data science:
+ *    - Mode A: Real-time Bland-Altman Agreement Plot (ΔHR vs Mean HR) with 95% LoA
+ *    - Mode B: Synchronized Beat Interval Tachogram (ECG R-R vs PPG Peak-to-Peak)
+ * ============================================================================ */
+function HeroClinicalInstrument() {
+  const [viewMode, setViewMode] = useState<'bland-altman' | 'tachogram'>('bland-altman');
+  const [motionProvocation, setMotionProvocation] = useState(false);
   const uid = useId().replace(/:/g, '');
-  const ppgGradId = `hero-ppg-${uid}`;
-  const ecgGradId = `hero-ecg-${uid}`;
+  const corridorGradId = `hero-corridor-${uid}`;
+
+  // 32 Realistic paired cardiac observations: Mean HR (X: 55-145 bpm) vs Difference (Y: Test - Ref bpm)
+  // Baseline: tight clustering around bias +0.34 bpm within [-3.8, +4.5] bpm
+  // Motion provoked: variance inflation + cadence-lock divergence at higher HR
+  const scatterPoints = [
+    { mean: 58, diff: 0.2, provDiff: 0.4 },
+    { mean: 62, diff: -0.8, provDiff: -1.2 },
+    { mean: 65, diff: 0.5, provDiff: 0.8 },
+    { mean: 68, diff: 1.1, provDiff: 1.9 },
+    { mean: 71, diff: -0.3, provDiff: -0.6 },
+    { mean: 73, diff: 0.4, provDiff: 1.1 },
+    { mean: 76, diff: -1.2, provDiff: -1.8 },
+    { mean: 79, diff: 0.7, provDiff: 1.4 },
+    { mean: 82, diff: 0.1, provDiff: 0.5 },
+    { mean: 85, diff: -0.6, provDiff: -1.1 },
+    { mean: 88, diff: 1.4, provDiff: 2.8 },
+    { mean: 91, diff: 0.3, provDiff: 1.2 },
+    { mean: 94, diff: -0.9, provDiff: -2.1 },
+    { mean: 97, diff: 0.6, provDiff: 2.3 },
+    { mean: 101, diff: 0.2, provDiff: 1.8 },
+    { mean: 104, diff: -1.4, provDiff: -3.5 },
+    { mean: 108, diff: 0.8, provDiff: 3.2 },
+    { mean: 112, diff: 1.2, provDiff: 4.6 },
+    { mean: 115, diff: -0.4, provDiff: -2.8 },
+    { mean: 119, diff: 0.9, provDiff: 5.4 },
+    { mean: 122, diff: -1.1, provDiff: -4.2 },
+    { mean: 126, diff: 1.5, provDiff: 6.8 },
+    { mean: 129, diff: 0.4, provDiff: 3.9 },
+    { mean: 132, diff: -0.7, provDiff: -5.1 },
+    { mean: 135, diff: 1.8, provDiff: 8.2 },
+    { mean: 138, diff: 0.5, provDiff: 4.7 },
+    { mean: 141, diff: -1.5, provDiff: -6.4 },
+    { mean: 144, diff: 0.8, provDiff: 7.9 },
+  ];
+
+  // Tachogram extracted inter-beat interval time series (ms) for 24 cardiac cycles
+  const rriSeries = [842, 835, 828, 819, 812, 804, 796, 788, 782, 775, 768, 762, 758, 754, 750, 746, 742, 739, 736, 734, 731, 729, 727, 725];
+  const ppiBaseline = [840, 837, 826, 821, 810, 806, 794, 790, 780, 777, 766, 764, 756, 756, 748, 748, 740, 741, 734, 736, 729, 731, 725, 727];
+  const ppiMotion = [840, 837, 826, 821, 810, 835, 820, 842, 815, 830, 805, 822, 790, 810, 785, 802, 775, 792, 765, 780, 755, 770, 745, 760];
+  const activePpi = motionProvocation ? ppiMotion : ppiBaseline;
+
+  // Coordinate scales for 800x170 Bland-Altman SVG
+  // X: Mean HR [50..150] -> pixel [55..665]
+  // Y: Diff [-15..+15] -> pixel [145..15], centered at y=80 (0 bpm)
+  const mapMeanX = (m: number) => 55 + ((m - 50) / 100) * 610;
+  const mapDiffY = (d: number) => 80 - (d / 15) * 65;
+
+  // LoA values
+  const upperLoA = motionProvocation ? 8.4 : 4.48;
+  const lowerLoA = motionProvocation ? -6.8 : -3.8;
+  const meanBias = motionProvocation ? 1.62 : 0.34;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl hairline-card bg-surface/90 backdrop-blur-md p-5 sm:p-6 shadow-xl border-subpixel">
-      {/* Ambient background glow */}
+    <div className="relative mx-auto w-full max-w-5xl">
+      {/* Subtle atmospheric glow behind the clinical instrument */}
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-series-1/10 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-series-3/10 blur-3xl"
+        className="pointer-events-none absolute -inset-x-8 -top-10 h-72 rounded-full bg-gradient-to-r from-sky-500/10 via-emerald-500/10 to-indigo-500/10 blur-3xl opacity-70"
         aria-hidden="true"
       />
 
-      {/* Header bar */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-4">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-          </span>
-          <span className="font-mono text-xs font-semibold tracking-wide text-ink">
-            LIVE COMPARATOR STAGE
-          </span>
-          <span className="rounded bg-plane px-2 py-0.5 font-mono text-[10px] text-ink-muted">
-            500 Hz Sync
-          </span>
-        </div>
-
-        {/* Motion Artifact Toggle */}
-        <button
-          type="button"
-          onClick={() => setHasMotion(!hasMotion)}
-          className={`group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all ${
-            hasMotion
-              ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-              : 'border-hairline bg-plane text-ink-secondary hover:text-ink hover:border-ink/20'
-          }`}
-          title="Toggle treadmill motion artifact simulation"
-        >
-          <Zap size={12} className={hasMotion ? 'text-amber-500 animate-bounce' : 'text-ink-muted'} />
-          <span>Motion Artifact: {hasMotion ? 'Provoked' : 'Baseline'}</span>
-        </button>
-      </div>
-
-      {/* Oscilloscope Waveform Display */}
-      <div className="relative z-10 my-4 rounded-xl border border-hairline/70 bg-[#090d16] p-4 text-white select-none">
-        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pb-2 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-cyan-400" />
-            <span>Wrist Optical PPG (Test Device)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-            <span>3-Lead ECG Holter (Ground Truth)</span>
-          </div>
-        </div>
-
-        {/* Oscilloscope SVG */}
-        <svg viewBox="0 0 500 130" className="w-full h-32 select-none" aria-hidden="true">
-          <defs>
-            <linearGradient id={ppgGradId} x1="0" y1="0" x2="0" y2="1">
-              <stop stopColor="#38bdf8" stopOpacity="0.3" />
-              <stop offset="1" stopColor="#38bdf8" stopOpacity="0.0" />
-            </linearGradient>
-            <linearGradient id={ecgGradId} x1="0" y1="0" x2="0" y2="1">
-              <stop stopColor="#10b981" stopOpacity="0.25" />
-              <stop offset="1" stopColor="#10b981" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-
-          {/* Grid coordinates */}
-          <line x1="0" y1="35" x2="500" y2="35" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="0" y1="65" x2="500" y2="65" stroke="#1e293b" />
-          <line x1="0" y1="95" x2="500" y2="95" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="125" y1="0" x2="125" y2="130" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="250" y1="0" x2="250" y2="130" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="375" y1="0" x2="375" y2="130" stroke="#1e293b" strokeDasharray="4 4" />
-
-          {/* ECG Trace (Clean QRS Complex) */}
-          <path
-            d="M 0 65 L 40 65 L 48 62 L 54 65 L 62 65 L 66 75 L 72 20 L 78 82 L 84 65 L 94 65 L 102 58 L 110 65 L 165 65 L 173 62 L 179 65 L 187 65 L 191 75 L 197 20 L 203 82 L 209 65 L 219 65 L 227 58 L 235 65 L 290 65 L 298 62 L 304 65 L 312 65 L 316 75 L 322 20 L 328 82 L 334 65 L 344 65 L 352 58 L 360 65 L 415 65 L 423 62 L 429 65 L 437 65 L 441 75 L 447 20 L 453 82 L 459 65 L 469 65 L 477 58 L 485 65 L 500 65"
-            fill="none"
-            stroke="#10b981"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-          />
-
-          {/* Optical PPG Trace (Smooth Pulsatile vs Motion Noise) */}
-          {hasMotion ? (
-            <path
-              d="M 0 68 C 25 65, 35 35, 75 35 C 100 35, 110 85, 130 95 C 150 105, 175 40, 200 40 C 225 40, 240 100, 265 85 C 290 70, 310 25, 335 25 C 360 25, 380 90, 410 80 C 440 70, 465 45, 500 55"
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          ) : (
-            <path
-              d="M 0 68 C 20 68, 55 38, 75 38 C 90 38, 105 56, 115 52 C 125 48, 145 68, 165 68 C 185 68, 220 38, 240 38 C 255 38, 270 56, 280 52 C 290 48, 310 68, 330 68 C 350 68, 385 38, 405 38 C 420 38, 435 56, 445 52 C 455 48, 475 68, 500 68"
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          )}
-        </svg>
-
-        {/* Real-time Telemetry Caliper Readout */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800 text-[11px] font-mono">
+      <div className="relative overflow-hidden rounded-2xl border border-hairline bg-[#090d16] text-slate-100 shadow-2xl">
+        {/* Top Instrument Control Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/90 bg-[#060911] px-5 py-3">
           <div className="flex items-center gap-3">
-            <div>
-              <span className="text-slate-400">Mean Bias: </span>
-              <span className={hasMotion ? 'font-bold text-amber-400' : 'font-bold text-emerald-400'}>
-                {hasMotion ? '+4.82 bpm' : '+0.34 bpm'}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-400">95% LoA: </span>
-              <span className="font-semibold text-slate-200">
-                {hasMotion ? '[-12.4, +22.0] bpm' : '[-3.8, +4.5] bpm'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                hasMotion
-                  ? 'bg-amber-500/20 text-amber-400'
-                  : 'bg-emerald-500/20 text-emerald-400'
-              }`}
-            >
-              {hasMotion ? 'MOTION ARTIFACT DETECTED' : 'AGREEMENT VERIFIED'}
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            </span>
+            <span className="font-mono text-xs font-bold tracking-wider uppercase text-slate-200">
+              Live Biosensor Validation Engine
+            </span>
+            <span className="rounded bg-slate-800/80 px-2 py-0.5 font-mono text-[10px] text-slate-400 border border-slate-700/60 hidden sm:inline">
+              500 Hz Sync • Paired Epoch Stream
             </span>
           </div>
-        </div>
-      </div>
 
-      {/* Footer Specs */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-muted">
-        <div className="flex items-center gap-2">
-          <Activity size={14} className="text-series-1" />
-          <span>Repeated-Measures Agreement ANOVA</span>
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle: LoA vs Tachogram */}
+            <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900/90 p-0.5 font-mono text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('bland-altman')}
+                className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                  viewMode === 'bland-altman'
+                    ? 'bg-slate-800 text-sky-400 font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                LoA Scatter Plane
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('tachogram')}
+                className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                  viewMode === 'tachogram'
+                    ? 'bg-slate-800 text-emerald-400 font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                R-R vs Peak-to-Peak Sync
+              </button>
+            </div>
+
+            {/* Provocation Stress-Test Trigger */}
+            <button
+              type="button"
+              onClick={() => setMotionProvocation(!motionProvocation)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-mono font-semibold transition-all cursor-pointer ${
+                motionProvocation
+                  ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+                  : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <Zap size={12} className={motionProvocation ? 'text-amber-400' : 'text-slate-500'} />
+              <span>{motionProvocation ? 'Cadence Lock Provoked' : 'Resting Baseline'}</span>
+            </button>
+          </div>
         </div>
-        <span className="font-mono text-[11px]">ISO 80601-2-61 • FDA 510(k) Ready</span>
+
+        {/* Analytical Visualization Stage */}
+        <div className="p-5 sm:p-6">
+          {viewMode === 'bland-altman' ? (
+            /* ================================================================
+             * VIEW A: TRUE BLAND-ALTMAN DIFFERENCE SCATTER PLOT
+             * ================================================================ */
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400">
+                <div className="flex items-center gap-4">
+                  <span className="inline-flex items-center gap-1.5 text-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    Paired Observations (Δ = Test − Ref)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                    <span className="h-0.5 w-3 bg-emerald-400" />
+                    Mean Bias ({meanBias >= 0 ? `+${meanBias.toFixed(2)}` : meanBias.toFixed(2)} bpm)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-slate-400 hidden sm:inline-flex">
+                    <span className="h-0.5 w-3 bg-slate-500 border-dashed border-t" />
+                    95% LoA Corridor ([{lowerLoA.toFixed(1)}, +{upperLoA.toFixed(1)}] bpm)
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500">ISO 80601-2-61 • N = 48 Paired Beats</span>
+              </div>
+
+              <svg viewBox="0 0 800 170" className="w-full h-auto select-none overflow-visible" aria-hidden="true">
+                <defs>
+                  <linearGradient id={corridorGradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor={motionProvocation ? '#f59e0b' : '#10b981'}
+                      stopOpacity="0.14"
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={motionProvocation ? '#f59e0b' : '#10b981'}
+                      stopOpacity="0.03"
+                    />
+                  </linearGradient>
+                </defs>
+
+                {/* 95% LoA Shaded Corridor */}
+                <rect
+                  x="55"
+                  y={mapDiffY(upperLoA)}
+                  width="610"
+                  height={mapDiffY(lowerLoA) - mapDiffY(upperLoA)}
+                  fill={`url(#${corridorGradId})`}
+                />
+
+                {/* Horizontal Reference Lines */}
+                <line x1="55" y1="15" x2="665" y2="15" stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="55" y1={mapDiffY(10)} x2="665" y2={mapDiffY(10)} stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="55" y1={mapDiffY(5)} x2="665" y2={mapDiffY(5)} stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="55" y1={mapDiffY(0)} x2="665" y2={mapDiffY(0)} stroke="#475569" strokeWidth="1" strokeDasharray="4 2" />
+                <line x1="55" y1={mapDiffY(-5)} x2="665" y2={mapDiffY(-5)} stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="55" y1={mapDiffY(-10)} x2="665" y2={mapDiffY(-10)} stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="55" y1="150" x2="665" y2="150" stroke="#1e293b" />
+
+                {/* Vertical Reference Grid */}
+                {[60, 80, 100, 120, 140].map((bpm) => (
+                  <line
+                    key={bpm}
+                    x1={mapMeanX(bpm)}
+                    y1="15"
+                    x2={mapMeanX(bpm)}
+                    y2="150"
+                    stroke="#1e293b"
+                    strokeDasharray="3 3"
+                  />
+                ))}
+
+                {/* Upper 95% LoA Line */}
+                <line
+                  x1="55"
+                  y1={mapDiffY(upperLoA)}
+                  x2="665"
+                  y2={mapDiffY(upperLoA)}
+                  stroke={motionProvocation ? '#f59e0b' : '#10b981'}
+                  strokeWidth="1.5"
+                  strokeDasharray="5 3"
+                />
+                <text
+                  x="675"
+                  y={mapDiffY(upperLoA) + 4}
+                  fill={motionProvocation ? '#f59e0b' : '#10b981'}
+                  fontSize="10"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  +1.96 SD (+{upperLoA.toFixed(1)})
+                </text>
+
+                {/* Mean Bias Line */}
+                <line
+                  x1="55"
+                  y1={mapDiffY(meanBias)}
+                  x2="665"
+                  y2={mapDiffY(meanBias)}
+                  stroke="#38bdf8"
+                  strokeWidth="1.75"
+                />
+                <text
+                  x="675"
+                  y={mapDiffY(meanBias) + 4}
+                  fill="#38bdf8"
+                  fontSize="10"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  Bias ({meanBias >= 0 ? `+${meanBias.toFixed(1)}` : meanBias.toFixed(1)})
+                </text>
+
+                {/* Lower 95% LoA Line */}
+                <line
+                  x1="55"
+                  y1={mapDiffY(lowerLoA)}
+                  x2="665"
+                  y2={mapDiffY(lowerLoA)}
+                  stroke={motionProvocation ? '#f59e0b' : '#10b981'}
+                  strokeWidth="1.5"
+                  strokeDasharray="5 3"
+                />
+                <text
+                  x="675"
+                  y={mapDiffY(lowerLoA) + 4}
+                  fill={motionProvocation ? '#f59e0b' : '#10b981'}
+                  fontSize="10"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  −1.96 SD ({lowerLoA.toFixed(1)})
+                </text>
+
+                {/* Scatter Points */}
+                {scatterPoints.map((pt, i) => {
+                  const val = motionProvocation ? pt.provDiff : pt.diff;
+                  const cx = mapMeanX(pt.mean);
+                  const cy = mapDiffY(val);
+                  const isOutlier = val > upperLoA || val < lowerLoA;
+                  return (
+                    <g key={i}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={isOutlier ? 4.5 : 3.5}
+                        fill={isOutlier ? '#f59e0b' : '#38bdf8'}
+                        stroke="#090d16"
+                        strokeWidth="1.5"
+                      />
+                      {isOutlier && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={7.5}
+                          fill="none"
+                          stroke="#f59e0b"
+                          strokeWidth="1"
+                          strokeDasharray="2 2"
+                        />
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Axis Labels */}
+                <text x="360" y="165" fill="#64748b" fontSize="10" fontFamily="monospace" textAnchor="middle">
+                  Mean Heart Rate (ECG + PPG) / 2 [bpm]
+                </text>
+                <text
+                  x="15"
+                  y="85"
+                  fill="#64748b"
+                  fontSize="10"
+                  fontFamily="monospace"
+                  textAnchor="middle"
+                  transform="rotate(-90 15 85)"
+                >
+                  Δ (PPG − ECG) [bpm]
+                </text>
+              </svg>
+            </div>
+          ) : (
+            /* ================================================================
+             * VIEW B: EXTRACTED BEAT INTERVAL TACHOGRAM (R-R vs Peak-to-Peak)
+             * ================================================================ */
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400">
+                <div className="flex items-center gap-4">
+                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    Reference: Holter ECG R-R Interval (RRI)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-sky-400">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    Test: Optical PPG Inter-Pulse Interval (PPI)
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500">Beat-by-Beat Temporal Alignment</span>
+              </div>
+
+              <svg viewBox="0 0 800 170" className="w-full h-auto select-none overflow-visible" aria-hidden="true">
+                {/* Horizontal Timing Grid */}
+                {[720, 760, 800, 840].map((ms) => {
+                  const y = 20 + ((860 - ms) / 160) * 125;
+                  return (
+                    <g key={ms}>
+                      <line x1="50" y1={y} x2="750" y2={y} stroke="#1e293b" strokeDasharray="3 3" />
+                      <text x="42" y={y + 3} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="end">
+                        {ms} ms
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* ECG R-R Trace (Emerald) */}
+                <path
+                  d={rriSeries
+                    .map((val, idx) => {
+                      const x = 55 + idx * 30;
+                      const y = 20 + ((860 - val) / 160) * 125;
+                      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+                    })
+                    .join(' ')}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+
+                {/* PPG PPI Trace (Sky) */}
+                <path
+                  d={activePpi
+                    .map((val, idx) => {
+                      const x = 55 + idx * 30;
+                      const y = 20 + ((860 - val) / 160) * 125;
+                      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+                    })
+                    .join(' ')}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeDasharray={motionProvocation ? '4 2' : undefined}
+                />
+
+                {/* Individual Beat Nodes */}
+                {rriSeries.map((val, idx) => {
+                  const x = 55 + idx * 30;
+                  const y = 20 + ((860 - val) / 160) * 125;
+                  return <circle key={idx} cx={x} cy={y} r="3" fill="#10b981" />;
+                })}
+                {activePpi.map((val, idx) => {
+                  const x = 55 + idx * 30;
+                  const y = 20 + ((860 - val) / 160) * 125;
+                  return <circle key={idx} cx={x} cy={y} r="2.5" fill="#38bdf8" />;
+                })}
+
+                {/* X-Axis Beat Index */}
+                <line x1="50" y1="150" x2="750" y2="150" stroke="#334155" />
+                <text x="400" y="165" fill="#64748b" fontSize="10" fontFamily="monospace" textAnchor="middle">
+                  Sequential Cardiac Beat Index (1 .. 24)
+                </text>
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom DOM Telemetry Strip — Crisp HTML Elements (Family.co style) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-slate-800/90 bg-[#060911] divide-x divide-slate-800/80">
+          <div className="px-5 py-3.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Mean Bias (d&#772;)
+            </div>
+            <div
+              className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${
+                motionProvocation ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {motionProvocation ? '+1.62 bpm' : '+0.34 bpm'}
+            </div>
+          </div>
+
+          <div className="px-5 py-3.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              95% Limits of Agreement
+            </div>
+            <div className="mt-0.5 font-mono text-base sm:text-lg font-bold text-slate-100">
+              {motionProvocation ? '[-6.8, +8.4] bpm' : '[-3.80, +4.48] bpm'}
+            </div>
+          </div>
+
+          <div className="px-5 py-3.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Concordance CCC (&rho;<sub>c</sub>)
+            </div>
+            <div className="mt-0.5 font-mono text-base sm:text-lg font-bold text-sky-400">
+              {motionProvocation ? '0.941' : '0.988'}
+            </div>
+          </div>
+
+          <div className="px-5 py-3.5 flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                Clinical Verdict
+              </div>
+              <div className="mt-1">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs font-bold ${
+                    motionProvocation
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      motionProvocation ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`}
+                  />
+                  {motionProvocation ? 'CADENCE SENSITIVITY' : 'PASS • FDA 510(k) READY'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * Flagship Studio 1: Protocol Studio Workbench
- * With live interactive Sample Size N slider updating the precision curve in real time.
- */
-function ProtocolStudioWorkbench() {
+/* ============================================================================
+ * 2. WORKBENCH CARD 1: PROTOCOL STUDIO
+ *    Interactive cohort slider running Greenwood precision equation
+ * ============================================================================ */
+function ProtocolStudioCard() {
   const [sampleN, setSampleN] = useState(42);
   const uid = useId().replace(/:/g, '');
-  const areaGradId = `sd-area-${uid}`;
+  const curveGradId = `protocol-curve-${uid}`;
 
-  // Calculated LoA margin: shrinks with 1 / sqrt(N - 1)
-  const marginWidth = Math.round((18.4 / Math.sqrt(sampleN - 1)) * 10) / 10;
-  // Normalized X position on canvas for N between 15 and 120
-  const normalizedX = 35 + ((sampleN - 15) / (120 - 15)) * 180;
-  const curveY = 25 + 75 * (1 - (sampleN - 15) / 105) ** 0.55;
+  // Greenwood LoA confidence margin width: w = 1.96 * sqrt(3 * s^2 / N)
+  // For physiological heart rate std dev s = 2.5 bpm
+  const marginWidth = (1.96 * Math.sqrt((3 * 6.25) / sampleN)).toFixed(1);
+
+  const minN = 15;
+  const maxN = 120;
+  const ratio = (sampleN - minN) / (maxN - minN);
+  const markerX = 24 + ratio * 552;
+  const markerY = 28 + 108 * (1 - Math.pow(ratio, 0.48));
+
+  // Precision curve coordinates
+  const curvePoints: string[] = [];
+  const upperBandPoints: string[] = [];
+  const lowerBandPoints: string[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const x = 24 + t * 552;
+    const y = 28 + 108 * (1 - Math.pow(t, 0.48));
+    const spread = 18 * (1 - 0.65 * t);
+    curvePoints.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`);
+    upperBandPoints.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${(y - spread).toFixed(1)}`);
+    lowerBandPoints.unshift(`L ${x.toFixed(1)} ${(y + spread).toFixed(1)}`);
+  }
+  const areaPath = `${upperBandPoints.join(' ')} ${lowerBandPoints.join(' ')} Z`;
+  const linePath = curvePoints.join(' ');
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-4">
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="rounded-md bg-series-1/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-1 border border-series-1/20">
+    <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm transition-colors hover:border-ink/25">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-400">
             PROTOCOL STUDIO
           </span>
-          <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] font-semibold text-series-1">
-            Live Math: N = {sampleN}
+          <span className="rounded-full bg-emerald-500/10 border border-emerald-500/25 px-3 py-0.5 font-mono text-xs font-bold text-emerald-400">
+            LoA Precision Margin: &plusmn;{marginWidth} bpm
           </span>
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink group-hover:text-series-1 transition-colors leading-snug">
-          Design your validation study
+
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
+          <Link to="/protocol-studio" className="hover:underline focus:outline-hidden">
+            Design your validation study
+          </Link>
         </h2>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-ink-secondary">
+        <p className="text-sm text-ink-secondary max-w-2xl">
           Sizing a study too small risks inconclusive results, while sizing it too large wastes time and budget. Design protocols for internal product KPIs, predecessor comparisons, or regulatory submissions that properly account for measurement agreement, repeated measures, and demographic quotas before enrolling participants.
         </p>
       </div>
 
-      {/* Interactive Precision Instrument */}
-      <div className="rounded-xl border border-hairline/70 bg-plane/70 p-4 space-y-3">
-        {/* Real-time Slider Control */}
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <label htmlFor="sample-size-slider" className="font-semibold text-ink">
-            Simulate Participant Cohort (N):
+      {/* Edge-to-Edge Responsive Precision Canvas */}
+      <div className="my-6 rounded-xl border border-slate-800/90 bg-[#090d16] p-5 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <label
+            htmlFor="protocol-n-slider"
+            className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-slate-300 cursor-pointer"
+          >
+            <Sliders size={13} className="text-sky-400" />
+            <span>Simulate Participant Cohort (N):</span>
           </label>
-          <span className="font-mono font-bold text-series-1 text-sm">{sampleN} subjects</span>
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <span className="rounded bg-sky-500/20 border border-sky-500/40 px-2.5 py-0.5 font-bold text-sky-300">
+              N = {sampleN} subjects
+            </span>
+            <span className="text-slate-400 hidden sm:inline">Non-Central t Exact Inversion</span>
+          </div>
         </div>
-        <input
-          id="sample-size-slider"
-          type="range"
-          min="15"
-          max="120"
-          value={sampleN}
-          onChange={(e) => setSampleN(Number(e.target.value))}
-          className="w-full accent-series-1 cursor-pointer"
-        />
 
-        {/* Dynamic Precision Curve SVG */}
-        <svg viewBox="0 0 320 120" className="w-full h-28 select-none" aria-hidden="true">
+        {/* Range Slider aligned with SVG coordinates */}
+        <div className="px-2">
+          <input
+            id="protocol-n-slider"
+            type="range"
+            min={minN}
+            max={maxN}
+            value={sampleN}
+            onChange={(e) => setSampleN(Number(e.target.value))}
+            className="w-full accent-sky-400 cursor-pointer h-2 rounded-lg bg-slate-800"
+          />
+        </div>
+
+        <svg viewBox="0 0 600 165" className="w-full h-auto select-none mt-2 overflow-visible" aria-hidden="true">
           <defs>
-            <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
-              <stop stopColor="var(--color-series-1)" stopOpacity="0.25" />
-              <stop offset="1" stopColor="var(--color-series-1)" stopOpacity="0.02" />
+            <linearGradient id={curveGradId} x1="0" y1="0" x2="0" y2="1">
+              <stop stopColor="#38bdf8" stopOpacity="0.28" />
+              <stop offset="1" stopColor="#38bdf8" stopOpacity="0.02" />
             </linearGradient>
           </defs>
 
-          {/* Grid lines */}
-          <line x1="35" y1="18" x2="225" y2="18" stroke="var(--color-hairline)" strokeDasharray="3 3" />
-          <line x1="35" y1="60" x2="225" y2="60" stroke="var(--color-hairline)" strokeDasharray="3 3" />
-          <line x1="35" y1="100" x2="225" y2="100" stroke="var(--color-hairline)" />
-          <line x1="35" y1="15" x2="35" y2="100" stroke="var(--color-hairline)" />
+          {/* Reference Gridlines */}
+          <line x1="24" y1="35" x2="576" y2="35" stroke="#1e293b" strokeDasharray="4 4" />
+          <line x1="24" y1="85" x2="576" y2="85" stroke="#1e293b" strokeDasharray="4 4" />
+          <line x1="24" y1="138" x2="576" y2="138" stroke="#334155" />
 
-          {/* Uncertainty envelope */}
-          <path
-            d="M 45 25 C 85 45, 125 72, 215 90 L 215 100 C 125 90, 85 68, 45 45 Z"
-            fill={`url(#${areaGradId})`}
-          />
-
-          {/* Precision curve */}
-          <path
-            d="M 45 35 C 85 52, 125 78, 215 95"
-            fill="none"
-            stroke="var(--color-series-1)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-
-          {/* Interactive Dynamic Marker */}
-          <line
-            x1={normalizedX}
-            y1="18"
-            x2={normalizedX}
-            y2="100"
-            stroke="var(--color-series-4)"
-            strokeWidth="1.5"
-            strokeDasharray="2 2"
-          />
-          <circle
-            cx={normalizedX}
-            cy={curveY}
-            r="4.5"
-            fill="var(--color-series-4)"
-            stroke="var(--color-surface)"
-            strokeWidth="1.5"
-          />
-
-          {/* Marker Pill */}
-          <rect
-            x={Math.max(45, Math.min(185, normalizedX - 24))}
-            y="12"
-            width="48"
-            height="15"
-            rx="3"
-            fill="var(--color-surface)"
-            stroke="var(--color-series-4)"
-            strokeWidth="1"
-          />
-          <text
-            x={Math.max(45, Math.min(185, normalizedX - 24)) + 24}
-            y="23"
-            fill="var(--color-series-4)"
-            fontSize="8"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            N = {sampleN}
+          {/* Clinical Tolerance Threshold */}
+          <line x1="24" y1="96" x2="576" y2="96" stroke="#10b981" strokeWidth="1" strokeDasharray="6 4" strokeOpacity="0.6" />
+          <text x="572" y="90" fill="#10b981" fontSize="11" fontFamily="monospace" textAnchor="end">
+            Clinical Target Corridor (&plusmn;2.5 bpm)
           </text>
 
-          {/* Caliper Section */}
-          <line x1="245" y1="25" x2="275" y2="25" stroke="var(--color-series-2)" strokeWidth="2" strokeLinecap="round" />
-          <text x="280" y="28" fill="var(--color-series-2)" fontSize="8.5" fontWeight="bold">+1.96 SD</text>
+          {/* Precision Envelope & Curve */}
+          <path d={areaPath} fill={`url(#${curveGradId})`} />
+          <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
 
-          <path d="M 242 25 L 235 25 L 235 57 L 230 60 L 235 63 L 235 95 L 242 95" fill="none" stroke="var(--color-series-1)" strokeWidth="1.5" />
-          <text x="226" y="63" fill="var(--color-series-1)" fontSize="8" fontWeight="bold" textAnchor="end">LoA</text>
+          {/* 1:1 Synchronized Caliper Line */}
+          <line
+            x1={markerX}
+            y1="12"
+            x2={markerX}
+            y2="138"
+            stroke="#f59e0b"
+            strokeWidth="1.75"
+            strokeDasharray="3 3"
+          />
+          <circle cx={markerX} cy={markerY} r="6" fill="#f59e0b" stroke="#090d16" strokeWidth="2.5" />
 
-          <line x1="242" y1="60" x2="265" y2="60" stroke="var(--color-ink-secondary)" strokeWidth="1.2" strokeDasharray="3 2" />
-          <text x="270" y="63" fill="var(--color-ink-muted)" fontSize="8">Bias</text>
+          {/* Caliper Callout */}
+          <g transform={`translate(${Math.max(70, Math.min(530, markerX))}, ${Math.max(26, markerY - 22)})`}>
+            <rect x="-62" y="-16" width="124" height="22" rx="5" fill="#0f172a" stroke="#f59e0b" strokeWidth="1.2" />
+            <text x="0" y="-1" fill="#fde68a" fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+              N={sampleN} &bull; &plusmn;{marginWidth} bpm
+            </text>
+          </g>
 
-          <line x1="245" y1="95" x2="275" y2="95" stroke="var(--color-series-2)" strokeWidth="2" strokeLinecap="round" />
-          <text x="280" y="98" fill="var(--color-series-2)" fontSize="8.5" fontWeight="bold">-1.96 SD</text>
+          <text x="24" y="156" fill="#64748b" fontSize="11" fontFamily="monospace">
+            N = 15 (Underpowered)
+          </text>
+          <text x="300" y="156" fill="#64748b" fontSize="11" fontFamily="monospace" textAnchor="middle">
+            N = 42 (FDA Standard)
+          </text>
+          <text x="576" y="156" fill="#64748b" fontSize="11" fontFamily="monospace" textAnchor="end">
+            N = 120 (High Precision)
+          </text>
         </svg>
-
-        {/* Dynamic calculation result */}
-        <div className="flex items-center justify-between text-xs text-ink-secondary font-mono border-t border-hairline pt-2">
-          <span>Limits of Agreement Margin: <strong className="text-series-1">±{marginWidth} bpm</strong></span>
-          <span className="text-[11px] text-ink-muted">Non-Central t Exact Inversion</span>
-        </div>
       </div>
 
-      <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-1">
-        <span>Enter Protocol Studio</span>
-        <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden />
+      <div className="flex items-center justify-between border-t border-hairline pt-4">
+        <span className="text-xs font-mono text-ink-muted">
+          Greenwood Variance &bull; Repeated-Measures ANOVA &bull; Monk Skin Tone Quotas
+        </span>
+        <Link
+          to="/protocol-studio"
+          className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-surface transition-all hover:opacity-90 shrink-0"
+        >
+          <span>Enter Protocol Studio</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
-    </div>
+    </article>
   );
 }
 
-/**
- * Companion Studio 2: Report Studio Gate Matrix
- * Featuring an interactive candidate selector that updates the bivariate 4-quadrant scatter plane.
- */
-function ReportStudioGateMatrix() {
+/* ============================================================================
+ * 3. WORKBENCH CARD 2: REPORT STUDIO
+ *    Tactile DOM 2x2 Launch Gate Scorecard
+ * ============================================================================ */
+function ReportStudioCard() {
   const [candidate, setCandidate] = useState<'v1' | 'v2.4'>('v2.4');
-  const uid = useId().replace(/:/g, '');
-  const ellipseGradId = `pg-ellipse-${uid}`;
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-4">
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="rounded-md bg-series-2/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-2 border border-series-2/20">
+    <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm transition-colors hover:border-ink/25">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-400">
             REPORT STUDIO
           </span>
-          <div className="flex rounded-lg border border-hairline bg-plane p-0.5 text-[10px] font-semibold">
+
+          <div className="inline-flex rounded-lg border border-hairline bg-plane p-0.5 text-xs font-mono font-semibold">
             <button
               type="button"
               onClick={() => setCandidate('v1')}
-              className={`rounded px-1.5 py-0.5 transition-all ${
-                candidate === 'v1' ? 'bg-surface text-ink shadow-xs' : 'text-ink-muted hover:text-ink'
+              className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                candidate === 'v1'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                  : 'text-ink-muted hover:text-ink'
               }`}
             >
               V1 Predecessor
@@ -359,516 +665,441 @@ function ReportStudioGateMatrix() {
             <button
               type="button"
               onClick={() => setCandidate('v2.4')}
-              className={`rounded px-1.5 py-0.5 transition-all ${
-                candidate === 'v2.4' ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'text-ink-muted hover:text-ink'
+              className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                candidate === 'v2.4'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-xs'
+                  : 'text-ink-muted hover:text-ink'
               }`}
             >
               V2.4 Candidate
             </button>
           </div>
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink group-hover:text-series-2 transition-colors leading-snug">
-          Evaluate product launch readiness
+
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
+          <Link to="/report-studio/overview" className="hover:underline focus:outline-hidden">
+            Evaluate product launch readiness
+          </Link>
         </h2>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-ink-secondary">
+        <p className="text-sm text-ink-secondary">
           Discover the right metrics and KPI frameworks to evaluate wearable performance, and synthesize your results into clear decision scorecards that your stakeholders can all understand and trust.
         </p>
       </div>
 
-      {/* 4-Quadrant Visualizer */}
-      <div className="rounded-xl border border-hairline/70 bg-plane/70 p-3 flex flex-col items-center justify-center">
-        <svg viewBox="0 0 320 130" className="w-full h-32 select-none" aria-hidden="true">
-          <defs>
-            <radialGradient id={ellipseGradId} cx="50%" cy="50%" r="50%">
-              <stop stopColor={candidate === 'v2.4' ? '#10b981' : '#f59e0b'} stopOpacity="0.35" />
-              <stop offset="1" stopColor={candidate === 'v2.4' ? '#10b981' : '#f59e0b'} stopOpacity="0.08" />
-            </radialGradient>
-          </defs>
+      {/* Tactile 2x2 Decision Matrix in DOM */}
+      <div className="my-6 rounded-xl border border-slate-800/90 bg-[#090d16] p-4 text-white">
+        <div className="grid grid-cols-2 gap-2.5 relative">
+          {/* Quadrant II: Top-Left */}
+          <div
+            className={`rounded-lg border p-3.5 transition-all ${
+              candidate === 'v1'
+                ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/5'
+                : 'border-slate-800 bg-slate-900/40 opacity-60'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <span className="font-bold text-amber-400">Q II &bull; PARITY RISK</span>
+              {candidate === 'v1' && (
+                <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                  ACTIVE
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-300 font-medium">
+              Meets absolute bound, underpowered vs. predecessor
+            </p>
+            {candidate === 'v1' && (
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-300">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                V1 Firmware: &sigma; = 4.9 bpm
+              </div>
+            )}
+          </div>
 
-          {/* Quadrants */}
-          <rect x="155" y="12" width="105" height="52" rx="4" fill="#10b981" fillOpacity={candidate === 'v2.4' ? 0.16 : 0.08} />
-          <rect x="50" y="12" width="105" height="52" rx="4" fill="#f59e0b" fillOpacity={candidate === 'v1' ? 0.18 : 0.08} />
-          <rect x="50" y="64" width="105" height="52" rx="4" fill="#ef4444" fillOpacity="0.08" />
-          <rect x="155" y="64" width="105" height="52" rx="4" fill="#f59e0b" fillOpacity="0.08" />
+          {/* Quadrant I: Top-Right (Green Light) */}
+          <div
+            className={`rounded-lg border p-3.5 transition-all ${
+              candidate === 'v2.4'
+                ? 'border-emerald-500/60 bg-emerald-500/15 shadow-lg shadow-emerald-500/5'
+                : 'border-slate-800 bg-slate-900/40 opacity-60'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <span className="font-bold text-emerald-400">Q I &bull; GREEN LIGHT</span>
+              {candidate === 'v2.4' && (
+                <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                  PASS
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-300 font-medium">
+              Superior to predicate &amp; inside clinical LoA corridor
+            </p>
+            {candidate === 'v2.4' && (
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                V2.4 Candidate: 98.4% CI
+              </div>
+            )}
+          </div>
 
-          {/* Labels */}
-          <text x="252" y="24" fill="#10b981" fontSize="7.5" fontWeight="bold" textAnchor="end">Q I • GREEN LIGHT</text>
-          <text x="58" y="24" fill="#f59e0b" fontSize="7" fontWeight="600">Q II • PARITY RISK</text>
-          <text x="58" y="110" fill="#ef4444" fontSize="7" fontWeight="600">Q III • REJECT</text>
-          <text x="252" y="110" fill="#f59e0b" fontSize="7" fontWeight="600" textAnchor="end">Q IV • QUALITY DEBT</text>
+          {/* Quadrant III: Bottom-Left */}
+          <div className="rounded-lg border border-slate-800/80 bg-slate-900/30 p-3 opacity-55">
+            <div className="text-[11px] font-mono font-bold text-rose-400">Q III &bull; REJECT GATE</div>
+            <p className="mt-1 text-xs text-slate-400">
+              Exceeds clinical error bounds &amp; degrades lineage
+            </p>
+          </div>
 
-          {/* Axes */}
-          <line x1="40" y1="64" x2="265" y2="64" stroke="var(--color-ink-secondary)" strokeWidth="1.2" />
-          <line x1="155" y1="12" x2="155" y2="116" stroke="var(--color-ink-secondary)" strokeWidth="1.2" />
-
-          {/* Candidate position */}
-          {candidate === 'v2.4' ? (
-            <g>
-              <ellipse cx="200" cy="38" rx="26" ry="14" transform="rotate(-15 200 38)" fill={`url(#${ellipseGradId})`} stroke="#10b981" strokeWidth="1.5" strokeDasharray="3 2" />
-              <circle cx="200" cy="38" r="4" fill="#10b981" stroke="var(--color-surface)" strokeWidth="1.5" />
-              <rect x="175" y="47" width="52" height="13" rx="2" fill="var(--color-surface)" stroke="#10b981" strokeWidth="0.75" />
-              <text x="201" y="56" fill="#10b981" fontSize="7" fontWeight="bold" textAnchor="middle">Candidate V2.4</text>
-            </g>
-          ) : (
-            <g>
-              <ellipse cx="105" cy="38" rx="26" ry="14" transform="rotate(10 105 38)" fill={`url(#${ellipseGradId})`} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 2" />
-              <circle cx="105" cy="38" r="4" fill="#f59e0b" stroke="var(--color-surface)" strokeWidth="1.5" />
-              <rect x="80" y="47" width="52" height="13" rx="2" fill="var(--color-surface)" stroke="#f59e0b" strokeWidth="0.75" />
-              <text x="106" y="56" fill="#f59e0b" fontSize="7" fontWeight="bold" textAnchor="middle">Predecessor V1</text>
-            </g>
-          )}
-
-          <circle cx="155" cy="64" r="3.5" fill="var(--color-ink-muted)" stroke="var(--color-surface)" strokeWidth="1.5" />
-          <text x="148" y="75" fill="var(--color-ink-muted)" fontSize="7" textAnchor="end">Origin (0, 0)</text>
-        </svg>
-
-        <div className="w-full text-center text-xs font-mono font-semibold pt-2 border-t border-hairline">
-          {candidate === 'v2.4' ? (
-            <span className="text-emerald-500">Verdict: PASS (98.4% Confidence in Q1)</span>
-          ) : (
-            <span className="text-amber-500">Verdict: PARITY RISK (Underpowered in Q2)</span>
-          )}
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-2">
-        <span>Enter Report Studio</span>
-        <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Companion Studio 3: Pitfall Explorer
- * Demonstrating the N=5 spurious difference test vs True Limits-of-Agreement corridor.
- */
-function PitfallExplorerCard() {
-  const [activeTrap, setActiveTrap] = useState<'trap' | 'loa'>('loa');
-
-  return (
-    <div className="flex flex-col justify-between h-full space-y-4">
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="rounded-md bg-series-4/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-4 border border-series-4/20">
-            PITFALL EXPLORER
-          </span>
-          <div className="flex rounded-lg border border-hairline bg-plane p-0.5 text-[10px] font-semibold">
-            <button
-              type="button"
-              onClick={() => setActiveTrap('trap')}
-              className={`rounded px-1.5 py-0.5 transition-all ${
-                activeTrap === 'trap' ? 'bg-red-500 text-white font-bold' : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              N=5 Trap
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTrap('loa')}
-              className={`rounded px-1.5 py-0.5 transition-all ${
-                activeTrap === 'loa' ? 'bg-emerald-500 text-white font-bold' : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              True Agreement
-            </button>
+          {/* Quadrant IV: Bottom-Right */}
+          <div className="rounded-lg border border-slate-800/80 bg-slate-900/30 p-3 opacity-55">
+            <div className="text-[11px] font-mono font-bold text-amber-400/80">Q IV &bull; QUALITY DEBT</div>
+            <p className="mt-1 text-xs text-slate-400">
+              Beats legacy baseline but fails clinical spec
+            </p>
           </div>
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink group-hover:text-series-4 transition-colors leading-snug">
-          Avoid costly statistical pitfalls
-        </h2>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-ink-secondary">
-          Standard statistical software was built to detect differences between groups rather than evaluate agreement, while generic AI assistants frequently fall into common statistical traps. Discover why standard methods fail when applied to paired wearable sensors, repeated measures, and rapid prototyping screens.
-        </p>
-      </div>
 
-      {/* Side-by-side or Toggled Pitfall Graphic */}
-      <div className="rounded-xl border border-hairline/70 bg-plane/70 p-3">
-        <svg viewBox="0 0 320 130" className="w-full h-32 select-none" aria-hidden="true">
-          {/* Left Panel: N=5 Noise Trap */}
-          <rect x="18" y="10" width="130" height="110" rx="6" fill="var(--color-surface)" stroke={activeTrap === 'trap' ? '#ef4444' : 'var(--color-hairline)'} strokeWidth={activeTrap === 'trap' ? 1.5 : 1} />
-          <rect x="26" y="16" width="114" height="16" rx="3" fill="#ef4444" fillOpacity="0.12" />
-          <text x="83" y="27" fill="#ef4444" fontSize="7.5" fontWeight="bold" textAnchor="middle">
-            N=5 NOISE TRAP (p &lt; 0.05)
-          </text>
-          <line x1="35" y1="90" x2="130" y2="45" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="3 2" />
-          <circle cx="40" cy="85" r="3" fill="#ef4444" />
-          <circle cx="62" cy="78" r="3" fill="#ef4444" />
-          <circle cx="82" cy="68" r="3" fill="#ef4444" />
-          <circle cx="108" cy="48" r="3" fill="#ef4444" />
-          <circle cx="128" cy="52" r="3" fill="#ef4444" />
-          <text x="83" y="102" fill="#ef4444" fontSize="7" fontWeight="600" textAnchor="middle">Winner&apos;s Curse Fallacy</text>
-          <text x="83" y="112" fill="var(--color-ink-muted)" fontSize="6.5" textAnchor="middle">Hides 8 bpm systematic bias</text>
-
-          {/* Divider */}
-          <line x1="160" y1="20" x2="160" y2="110" stroke="var(--color-hairline)" strokeDasharray="2 2" />
-          <circle cx="160" cy="65" r="8" fill="var(--color-surface)" stroke="var(--color-hairline)" />
-          <text x="160" y="68" fill="var(--color-ink-muted)" fontSize="7.5" fontWeight="bold" textAnchor="middle">vs</text>
-
-          {/* Right Panel: True Agreement Corridor */}
-          <rect x="172" y="10" width="130" height="110" rx="6" fill="var(--color-surface)" stroke={activeTrap === 'loa' ? '#10b981' : 'var(--color-hairline)'} strokeWidth={activeTrap === 'loa' ? 1.5 : 1} />
-          <rect x="180" y="16" width="114" height="16" rx="3" fill="#10b981" fillOpacity="0.12" />
-          <text x="237" y="27" fill="#10b981" fontSize="7.5" fontWeight="bold" textAnchor="middle">
-            TRUE AGREEMENT (LoA)
-          </text>
-          <rect x="182" y="42" width="110" height="48" fill="#10b981" fillOpacity="0.08" />
-          <line x1="182" y1="42" x2="292" y2="42" stroke="#10b981" strokeWidth="1.2" />
-          <line x1="182" y1="66" x2="292" y2="66" stroke="var(--color-ink-muted)" strokeWidth="1" strokeDasharray="3 2" />
-          <line x1="182" y1="90" x2="292" y2="90" stroke="#10b981" strokeWidth="1.2" />
-          <circle cx="198" cy="63" r="2.5" fill="#10b981" />
-          <circle cx="215" cy="58" r="2.5" fill="#10b981" />
-          <circle cx="232" cy="72" r="2.5" fill="#10b981" />
-          <circle cx="250" cy="61" r="2.5" fill="#10b981" />
-          <circle cx="268" cy="69" r="2.5" fill="#10b981" />
-          <circle cx="282" cy="65" r="2.5" fill="#10b981" />
-          <text x="237" y="102" fill="#10b981" fontSize="7" fontWeight="600" textAnchor="middle">Repeated Measures ANOVA</text>
-          <text x="237" y="112" fill="var(--color-ink-muted)" fontSize="6.5" textAnchor="middle">Exact ±1.96 SD limits</text>
-        </svg>
-
-        <div className="text-center text-xs font-mono pt-2 border-t border-hairline">
-          <span className="text-ink-secondary">High correlation does not equal measurement agreement.</span>
+        {/* Clear Verdict Readout Bar */}
+        <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-3 font-mono text-xs">
+          <span className="text-slate-400">Gate Decision:</span>
+          {candidate === 'v2.4' ? (
+            <span className="font-bold text-emerald-400">
+              SHIP CANDIDATE V2.4 (98.4% Bivariate Confidence)
+            </span>
+          ) : (
+            <span className="font-bold text-amber-400">
+              HOLD V1 RELEASE (Parity Risk in High-Motion Stratum)
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-4">
-        <span>Enter Pitfall Explorer</span>
-        <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden />
+      <div className="flex items-center justify-between border-t border-hairline pt-4">
+        <span className="text-xs font-mono text-ink-muted">
+          2x2 Equivalence Gate &bull; Subgroup Audits &bull; Automated Decision Scorecards
+        </span>
+        <Link
+          to="/report-studio/overview"
+          className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-surface transition-all hover:opacity-90 shrink-0"
+        >
+          <span>Enter Report Studio</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
-    </div>
+    </article>
   );
 }
 
-/**
- * Flagship Studio 4: Learning Studio Interactive Flight Path
- * Following the fictional Meridian PulseBand 2 product lifecycle through 8 interactive modules.
- */
-function LearningStudioFlightPath() {
-  const [activeStep, setActiveStep] = useState(5);
-  const uid = useId().replace(/:/g, '');
-  const podRingGradId = `ac-pod-${uid}`;
-  const greenGlowId = `ac-glow-${uid}`;
-
-  const stepDescriptions = [
-    'Module 1: Breadboard Optical Benchmarking & SNR',
-    'Module 2: Greenwood LoA Precision & Sample Sizing',
-    'Module 3: Cadence Lock Dynamic Provocation Protocol',
-    'Module 4: Monk Skin Tone Scale Melanin Compensation',
-    'Module 5: Active Exercise & Accelerometer Motion Rejection',
-    'Module 6: FDA 510(k) Clinical Predicate Alignment',
-    'Module 7: Launch Gate 2x2 Decision Scorecard Matrix',
-    'Module 8: Multi-Year Optical Sensor & Algorithmic Drift',
-  ];
+/* ============================================================================
+ * 4. WORKBENCH CARD 3: PITFALL EXPLORER
+ * ============================================================================ */
+function PitfallExplorerCard() {
+  const [mode, setMode] = useState<'trap' | 'loa'>('loa');
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-4">
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="rounded-md bg-series-3/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-3 border border-series-3/20">
-            LEARNING STUDIO
+    <article className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* Left 5 Columns: Narrative & Mode Switcher */}
+        <div className="lg:col-span-5 space-y-4">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-rose-400">
+            PITFALL EXPLORER
           </span>
-          <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] font-semibold text-series-3">
-            Case Study: Module {activeStep} of 8
-          </span>
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink group-hover:text-series-3 transition-colors leading-snug">
-          Learn wearable validation hands-on
-        </h2>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-ink-secondary">
-          Step into the shoes of a lead validation scientist developing the fictional Meridian PulseBand 2. Work through 8 interactive modules spanning the full product journey—from early prototyping and product launch to investigating post-launch issues and tracking multi-year device iterations.
-        </p>
-      </div>
 
-      {/* Interactive 8-Stage Lifecycle Flightpath */}
-      <div className="rounded-xl border border-hairline/70 bg-plane/70 p-4 space-y-3">
-        {/* Module step selector */}
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
+            <Link to="/explainers" className="hover:underline focus:outline-hidden">
+              Avoid costly statistical pitfalls
+            </Link>
+          </h2>
+
+          <p className="text-sm text-ink-secondary leading-relaxed">
+            Standard statistical software was built to detect differences between groups rather than evaluate agreement, while generic AI assistants frequently fall into common statistical traps. Discover why standard methods fail when applied to paired wearable sensors, repeated measures, and rapid prototyping screens.
+          </p>
+
+          <div className="flex flex-wrap gap-2 pt-1">
             <button
-              key={s}
               type="button"
-              onClick={() => setActiveStep(s)}
-              className={`rounded-lg py-1.5 text-xs font-mono font-bold transition-all ${
-                activeStep === s
-                  ? 'bg-emerald-500 text-white shadow-xs'
-                  : 'bg-surface text-ink-secondary hover:text-ink hover:bg-plane border border-hairline'
+              onClick={() => setMode('trap')}
+              className={`rounded-xl px-3.5 py-2 font-mono text-xs font-bold transition-all cursor-pointer border ${
+                mode === 'trap'
+                  ? 'bg-rose-500/15 border-rose-500/50 text-rose-400'
+                  : 'bg-plane border-hairline text-ink-secondary hover:text-ink'
               }`}
             >
-              M{s}
+              Trap #1: Pearson r = 0.96 Illusion
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setMode('loa')}
+              className={`rounded-xl px-3.5 py-2 font-mono text-xs font-bold transition-all cursor-pointer border ${
+                mode === 'loa'
+                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
+                  : 'bg-plane border-hairline text-ink-secondary hover:text-ink'
+              }`}
+            >
+              Solution: Repeated-Measures LoA
+            </button>
+          </div>
+
+          <div className="pt-2">
+            <Link
+              to="/explainers"
+              className="inline-flex items-center gap-2 text-xs font-bold text-ink hover:text-sky-400 transition-colors"
+            >
+              <span>Enter Pitfall Explorer</span>
+              <ArrowRight size={14} />
+            </Link>
+          </div>
         </div>
 
-        {/* Biosensor Pod Schematics Graphic */}
-        <svg viewBox="0 0 320 120" className="w-full h-28 select-none" aria-hidden="true">
-          <defs>
-            <linearGradient id={podRingGradId} x1="0" y1="0" x2="1" y2="1">
-              <stop stopColor="#0284c7" />
-              <stop offset="0.5" stopColor="#38bdf8" />
-              <stop offset="1" stopColor="#10b981" />
-            </linearGradient>
-            <filter id={greenGlowId} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
+        {/* Right 7 Columns: Side-by-Side Proof */}
+        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-slate-800/90 bg-[#090d16] p-4 text-white">
+          {/* Panel A: The Naive Correlation Trap */}
+          <div
+            className={`rounded-lg border p-4 transition-all ${
+              mode === 'trap'
+                ? 'border-rose-500/60 bg-rose-950/20'
+                : 'border-slate-800 bg-slate-900/40 opacity-75'
+            }`}
+          >
+            <div className="flex items-center justify-between font-mono text-xs mb-2">
+              <span className="font-bold text-rose-400">THE CORRELATION TRAP</span>
+              <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
+                r = 0.96 (p &lt; 0.001)
+              </span>
+            </div>
+            <svg viewBox="0 0 240 110" className="w-full h-auto select-none my-2" aria-hidden="true">
+              <line x1="20" y1="95" x2="220" y2="95" stroke="#334155" />
+              <line x1="20" y1="15" x2="20" y2="95" stroke="#334155" />
+              <line x1="25" y1="90" x2="210" y2="25" stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1="25" y1="78" x2="210" y2="12" stroke="#f43f5e" strokeWidth="2" />
+              <circle cx="45" cy="71" r="3.5" fill="#f43f5e" />
+              <circle cx="80" cy="58" r="3.5" fill="#f43f5e" />
+              <circle cx="115" cy="46" r="3.5" fill="#f43f5e" />
+              <circle cx="155" cy="31" r="3.5" fill="#f43f5e" />
+              <circle cx="195" cy="18" r="3.5" fill="#f43f5e" />
+            </svg>
+            <p className="text-xs text-slate-300 font-mono">
+              Conceals a <strong className="text-rose-400">+8.4 bpm systematic bias</strong> despite near-perfect correlation.
+            </p>
+          </div>
 
-          {/* Orbits */}
-          <ellipse cx="160" cy="60" rx="120" ry="42" fill="none" stroke="var(--color-hairline)" strokeWidth="1" strokeDasharray="3 3" />
-          <ellipse cx="160" cy="60" rx="85" ry="30" fill="none" stroke="var(--color-series-1)" strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.4" />
-
-          {/* Center Pod */}
-          <rect x="135" y="40" width="50" height="40" rx="10" fill="#090d16" stroke={`url(#${podRingGradId})`} strokeWidth="1.5" />
-          <circle cx="147" cy="55" r="3" fill="#22c55e" filter={`url(#${greenGlowId})`} />
-          <circle cx="160" cy="55" r="3" fill="#ef4444" />
-          <circle cx="173" cy="55" r="3" fill="#a855f7" />
-          <rect x="146" y="64" width="28" height="5" rx="1.5" fill="#1e293b" stroke="#38bdf8" strokeWidth="0.5" />
-
-          {/* Orbit Nodes */}
-          <circle cx="50" cy="60" r="7" fill={activeStep === 1 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-1)" strokeWidth="1.5" />
-          <text x="50" y="63" fill={activeStep === 1 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">1</text>
-
-          <circle cx="85" cy="35" r="7" fill={activeStep === 2 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-1)" strokeWidth="1.5" />
-          <text x="85" y="38" fill={activeStep === 2 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">2</text>
-
-          <circle cx="120" cy="22" r="7" fill={activeStep === 3 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-3)" strokeWidth="1.5" />
-          <text x="120" y="25" fill={activeStep === 3 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">3</text>
-
-          <circle cx="200" cy="22" r="7" fill={activeStep === 4 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-3)" strokeWidth="1.5" />
-          <text x="200" y="25" fill={activeStep === 4 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">4</text>
-
-          <circle cx="235" cy="35" r="7" fill={activeStep === 5 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-4)" strokeWidth="1.5" />
-          <text x="235" y="38" fill={activeStep === 5 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">5</text>
-
-          <circle cx="270" cy="60" r="7" fill={activeStep === 6 ? '#10b981' : 'var(--color-surface)'} stroke="var(--color-series-4)" strokeWidth="1.5" />
-          <text x="270" y="63" fill={activeStep === 6 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">6</text>
-
-          <circle cx="235" cy="85" r="7" fill={activeStep === 7 ? '#10b981' : 'var(--color-surface)'} stroke="#10b981" strokeWidth="1.5" />
-          <text x="235" y="88" fill={activeStep === 7 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">7</text>
-
-          <circle cx="85" cy="85" r="7" fill={activeStep === 8 ? '#10b981' : 'var(--color-surface)'} stroke="#10b981" strokeWidth="1.5" />
-          <text x="85" y="88" fill={activeStep === 8 ? '#ffffff' : 'var(--color-ink)'} fontSize="7" fontWeight="bold" textAnchor="middle">8</text>
-        </svg>
-
-        {/* Current phase readout */}
-        <div className="flex items-center justify-between text-xs text-ink-secondary border-t border-hairline pt-2 font-mono">
-          <span className="font-semibold text-emerald-500">{stepDescriptions[activeStep - 1]}</span>
-          <span className="text-[11px] text-ink-muted">Interactive Sandbox</span>
+          {/* Panel B: True Limits of Agreement */}
+          <div
+            className={`rounded-lg border p-4 transition-all ${
+              mode === 'loa'
+                ? 'border-emerald-500/60 bg-emerald-950/20'
+                : 'border-slate-800 bg-slate-900/40 opacity-75'
+            }`}
+          >
+            <div className="flex items-center justify-between font-mono text-xs mb-2">
+              <span className="font-bold text-emerald-400">TRUE AGREEMENT CORRIDOR</span>
+              <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                &plusmn;1.96 SD Corridor
+              </span>
+            </div>
+            <svg viewBox="0 0 240 110" className="w-full h-auto select-none my-2" aria-hidden="true">
+              <rect x="20" y="28" width="200" height="54" fill="#10b981" fillOpacity="0.1" />
+              <line x1="20" y1="28" x2="220" y2="28" stroke="#10b981" strokeWidth="1.5" />
+              <line x1="20" y1="55" x2="220" y2="55" stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 3" />
+              <line x1="20" y1="82" x2="220" y2="82" stroke="#10b981" strokeWidth="1.5" />
+              <circle cx="45" cy="51" r="3.5" fill="#10b981" />
+              <circle cx="80" cy="62" r="3.5" fill="#10b981" />
+              <circle cx="115" cy="48" r="3.5" fill="#10b981" />
+              <circle cx="155" cy="59" r="3.5" fill="#10b981" />
+              <circle cx="195" cy="53" r="3.5" fill="#10b981" />
+            </svg>
+            <p className="text-xs text-slate-300 font-mono">
+              Exposes exact mean bias and <strong className="text-emerald-400">true Limits of Agreement</strong> across subjects.
+            </p>
+          </div>
         </div>
       </div>
-
-      <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-3">
-        <span>Enter Learning Studio</span>
-        <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden />
-      </div>
-    </div>
+    </article>
   );
 }
 
-/**
- * Tactical Ecosystem Engine 1: agreekit Python REPL
- */
-function AgreekitReplWidget() {
-  const [tab, setTab] = useState<'python' | 'cli'>('python');
-  const [copied, setCopied] = useState(false);
+/* ============================================================================
+ * 5. THE VALIDATION ACADEMY: MERIDIAN PULSEBAND 2 (Learning Studio)
+ * ============================================================================ */
+function ValidationAcademyShowcase() {
+  const [activeStep, setActiveStep] = useState(1);
 
-  function copyCode() {
-    const code = tab === 'cli' ? 'agreekit analyze --data paired_spo2.csv' : 'import agreekit as ak\nres = ak.bland_altman(ref=ecg, test=ppg)\nprint(res.summary())';
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
+  const modules = [
+    {
+      step: 1,
+      phase: 'Prototyping',
+      title: 'Optical Bench & SNR Baseline',
+      desc: 'Evaluate raw green/red/IR PPG perfusion indices against benchtop phantoms before human trials.',
+      metric: 'SNR Gate: > 18 dB',
+    },
+    {
+      step: 2,
+      phase: 'Study Sizing',
+      title: 'Greenwood LoA Sample Sizing',
+      desc: 'Size the Meridian PulseBand 2 cohort so outer 95% confidence bounds fit strictly inside ±5.0 bpm.',
+      metric: 'Cohort: N = 48',
+    },
+    {
+      step: 3,
+      phase: 'Provocation',
+      title: 'Cadence Lock Treadmill Protocol',
+      desc: 'Stress-test optical heart rate tracking across step-frequency harmonics during incline running.',
+      metric: 'Harmonic Reject: 94%',
+    },
+    {
+      step: 4,
+      phase: 'Equity & Quotas',
+      title: 'Monk Skin Tone Stratification',
+      desc: 'Balance participant recruitment across all 10 Monk Skin Tone levels to prevent melanin absorption bias.',
+      metric: 'MST 8–10 Quota: ≥ 35%',
+    },
+    {
+      step: 5,
+      phase: 'Motion Compensation',
+      title: 'Accelerometer Sensor Fusion',
+      desc: 'Validate adaptive noise cancellation algorithms under high-G wrist kinematics.',
+      metric: 'Motion RMSE: 2.1 bpm',
+    },
+    {
+      step: 6,
+      phase: 'Regulatory',
+      title: 'FDA 510(k) Predicate Alignment',
+      desc: 'Pair test data against clinical 3-lead ECG and arterial blood gas CO-oximetry predicates.',
+      metric: 'ISO 80601-2-61',
+    },
+    {
+      step: 7,
+      phase: 'Launch Gate',
+      title: 'Bivariate 2x2 Release Scorecard',
+      desc: 'Synthesize subgroup performance into an executive Go/No-Go firmware release decision.',
+      metric: 'Verdict: Q1 PASS',
+    },
+    {
+      step: 8,
+      phase: 'Post-Market',
+      title: 'Multi-Year Algorithmic Drift Audit',
+      desc: 'Monitor longitudinal firmware updates against locked reference datasets to prevent regression.',
+      metric: 'Drift: < 0.2 bpm/yr',
+    },
+  ];
 
-  function copyInstall() {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText('pip install agreekit');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
+  const currentMod = (modules[activeStep - 1] ?? modules[0])!;
 
   return (
-    <div className="rounded-xl border border-hairline/70 bg-[#090d16] text-white p-3.5 space-y-2.5 font-mono text-xs select-none">
-      {/* Terminal Title Bar */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
-          <span className="ml-2 text-[10px] text-slate-400">agreekit v1.0 • Python REPL</span>
+    <section
+      aria-label="The Validation Academy Guided Curriculum"
+      className="relative overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-[#0f172a] via-[#090d16] to-[#0c1324] p-6 sm:p-10 text-white shadow-xl"
+    >
+      <div
+        className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-500/15 blur-3xl"
+        aria-hidden="true"
+      />
+
+      <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-slate-800 pb-6">
+        <div className="space-y-2 max-w-2xl">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-400">
+              LEARNING STUDIO
+            </span>
+            <span className="text-slate-600">&bull;</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 px-3 py-0.5 font-mono text-xs font-bold text-indigo-300">
+              <Sparkles size={12} />
+              <span>8-Stage Longitudinal Flight Path</span>
+            </span>
+          </div>
+
+          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+            The Validation Academy
+          </h2>
+
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-200">
+            <Link to="/academy" className="hover:underline focus:outline-hidden">
+              Learn wearable validation hands-on
+            </Link>
+          </h2>
+
+          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+            Step into the shoes of a lead validation scientist developing the fictional Meridian PulseBand 2. Work through 8 interactive modules spanning the full product journey—from early prototyping and product launch to investigating post-launch issues and tracking multi-year device iterations.
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={copyCode}
-          className="text-slate-400 hover:text-white transition-colors"
-          title="Copy snippet"
+        <Link
+          to="/academy"
+          className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-xs sm:text-sm font-bold text-slate-950 shadow-md transition-all hover:bg-slate-100 self-start lg:self-auto shrink-0"
         >
-          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-        </button>
+          <span>Enter Validation Academy</span>
+          <ArrowRight size={15} />
+        </Link>
       </div>
 
-      {/* Quick Install Pill */}
-      <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/90 px-2.5 py-1.5 border border-slate-800 text-[11px]">
-        <div className="flex items-center gap-1.5 text-slate-300">
-          <Terminal size={12} className="text-amber-400 shrink-0" aria-hidden />
-          <span className="text-amber-400 select-none">$</span>
-          <span className="text-slate-100 font-semibold">pip install agreekit</span>
+      {/* 8-Module Step Selector */}
+      <div className="relative z-10 mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        {modules.map((m) => {
+          const isSelected = m.step === activeStep;
+          return (
+            <button
+              key={m.step}
+              type="button"
+              onClick={() => setActiveStep(m.step)}
+              className={`flex flex-col items-start justify-between rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                isSelected
+                  ? 'border-indigo-400 bg-indigo-500/20 text-white shadow-md'
+                  : 'border-slate-800/90 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <span className={`font-mono text-xs font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-500'}`}>
+                M0{m.step}
+              </span>
+              <span className="mt-1 text-xs font-semibold line-clamp-1">{m.phase}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Active Module Detail */}
+      <div className="relative z-10 mt-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center rounded-2xl border border-slate-800 bg-[#060911]/90 p-5 sm:p-6">
+        <div className="lg:col-span-8 space-y-2">
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <span className="text-indigo-400 font-bold uppercase">
+              Module 0{currentMod.step} // {currentMod.phase}
+            </span>
+            <span className="text-slate-600">&bull;</span>
+            <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-emerald-300 font-semibold">
+              {currentMod.metric}
+            </span>
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-white">{currentMod.title}</h3>
+          <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">{currentMod.desc}</p>
         </div>
-        <button
-          type="button"
-          onClick={copyInstall}
-          className="text-slate-400 hover:text-amber-400 transition-colors text-[10px] font-sans font-medium"
-        >
-          Copy
-        </button>
-      </div>
 
-      {/* Interactive Tabs */}
-      <div className="flex items-center gap-2 text-[11px] pt-0.5">
-        <button
-          type="button"
-          onClick={() => setTab('python')}
-          className={`px-2 py-0.5 rounded transition-all ${tab === 'python' ? 'bg-slate-800 text-cyan-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-        >
-          Python API
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('cli')}
-          className={`px-2 py-0.5 rounded transition-all ${tab === 'cli' ? 'bg-slate-800 text-amber-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-        >
-          CLI Terminal
-        </button>
-      </div>
-
-      {tab === 'python' ? (
-        <div className="text-[11px] leading-relaxed text-slate-300 min-h-[44px]">
-          <p><span className="text-purple-400">import</span> agreekit <span className="text-purple-400">as</span> ak</p>
-          <p>res = ak.<span className="text-cyan-400">analyze</span>(ref=ecg, test=wrist_ppg)</p>
-          <p className="text-emerald-400"># Limits of agreement &amp; parameter confidence</p>
+        <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-end gap-2 border-t lg:border-t-0 lg:border-l border-slate-800 pt-4 lg:pt-0 lg:pl-6">
+          <div className="text-xs font-mono text-slate-400 lg:text-right">
+            Includes interactive sandbox, synthetic sensor dataset &amp; reference solution.
+          </div>
+          <Link
+            to="/academy"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-400/40 bg-indigo-500/15 hover:bg-indigo-500/25 px-4 py-2 text-xs font-mono font-bold text-indigo-200 transition-colors"
+          >
+            <span>Launch Module 0{currentMod.step} Sandbox</span>
+            <ArrowRight size={13} />
+          </Link>
         </div>
-      ) : (
-        <div className="text-[11px] leading-relaxed text-slate-300 min-h-[44px]">
-          <p><span className="text-amber-400">$</span> agreekit analyze --data paired_spo2.csv</p>
-          <p className="text-slate-400"># Pairwise limits-of-agreement analysis</p>
-        </div>
-      )}
-
-      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-        <span>Bland-Altman</span>
-        <span>•</span>
-        <span>Bootstrap CI</span>
-        <span>•</span>
-        <span>Non-Inferiority</span>
       </div>
-    </div>
+    </section>
   );
 }
 
-/**
- * Tactical Ecosystem Engine 2: Population Data Curves
- */
-function PopulationDataWidget() {
-  const uid = useId().replace(/:/g, '');
-  const popGrad1Id = `pop-g1-${uid}`;
-  const popGrad2Id = `pop-g2-${uid}`;
-
-  return (
-    <div className="rounded-xl border border-hairline/70 bg-plane/70 p-3">
-      <svg viewBox="0 0 320 120" className="w-full h-28 select-none" aria-hidden="true">
-        <defs>
-          <linearGradient id={popGrad1Id} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="var(--color-series-5)" stopOpacity="0.25" />
-            <stop offset="1" stopColor="var(--color-series-5)" stopOpacity="0.02" />
-          </linearGradient>
-          <linearGradient id={popGrad2Id} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="var(--color-series-1)" stopOpacity="0.22" />
-            <stop offset="1" stopColor="var(--color-series-1)" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-
-        <line x1="30" y1="95" x2="290" y2="95" stroke="var(--color-hairline)" strokeWidth="1" />
-        <path d="M 50 95 C 90 95, 115 28, 145 28 C 175 28, 200 95, 240 95 Z" fill={`url(#${popGrad1Id})`} />
-        <path d="M 50 95 C 90 95, 115 28, 145 28 C 175 28, 200 95, 240 95" fill="none" stroke="var(--color-series-5)" strokeWidth="2" />
-        <path d="M 85 95 C 125 95, 155 38, 185 38 C 215 38, 245 95, 285 95 Z" fill={`url(#${popGrad2Id})`} />
-        <path d="M 85 95 C 125 95, 155 38, 185 38 C 215 38, 245 95, 285 95" fill="none" stroke="var(--color-series-1)" strokeWidth="2" />
-
-        <line x1="85" y1="48" x2="85" y2="95" stroke="var(--color-ink-muted)" strokeWidth="1" strokeDasharray="2 2" />
-        <text x="85" y="44" fill="var(--color-ink-muted)" fontSize="7" textAnchor="middle">P5</text>
-        <line x1="165" y1="20" x2="165" y2="95" stroke="var(--color-series-5)" strokeWidth="1.5" strokeDasharray="2 2" />
-        <rect x="145" y="10" width="40" height="13" rx="2" fill="var(--color-surface)" stroke="var(--color-series-5)" strokeWidth="0.75" />
-        <text x="165" y="19" fill="var(--color-series-5)" fontSize="7.5" fontWeight="bold" textAnchor="middle">Median</text>
-        <line x1="245" y1="48" x2="245" y2="95" stroke="var(--color-ink-muted)" strokeWidth="1" strokeDasharray="2 2" />
-        <text x="245" y="44" fill="var(--color-ink-muted)" fontSize="7" textAnchor="middle">P95</text>
-
-        <text x="50" y="108" fill="var(--color-ink-muted)" fontSize="7.5">50 bpm</text>
-        <text x="165" y="108" fill="var(--color-ink-muted)" fontSize="7.5" textAnchor="middle">75 bpm</text>
-        <text x="260" y="108" fill="var(--color-ink-muted)" fontSize="7.5" textAnchor="end">100 bpm</text>
-      </svg>
-      <div className="flex items-center justify-between text-[11px] font-mono text-ink-muted border-t border-hairline pt-2">
-        <span>CDC NHANES • SCIN Baseline</span>
-        <span className="font-semibold text-series-5">Weighted Densities</span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Tactical Ecosystem Engine 3: Reference Device Spec Sheet
- */
-function ReferenceDeviceWidget() {
-  return (
-    <div className="rounded-xl border border-hairline/70 bg-plane/70 p-3">
-      <svg viewBox="0 0 320 120" className="w-full h-28 select-none" aria-hidden="true">
-        <rect x="10" y="8" width="300" height="104" rx="8" fill="var(--color-surface)" stroke="var(--color-hairline)" />
-
-        {/* Tier 1: Gold */}
-        <g transform="translate(24, 16)">
-          <rect x="0" y="0" width="84" height="60" rx="6" fill="#f59e0b" fillOpacity="0.08" stroke="#f59e0b" strokeWidth="1" />
-          <rect x="6" y="6" width="38" height="12" rx="3" fill="#f59e0b" fillOpacity="0.18" />
-          <text x="25" y="15" fill="#d97706" fontSize="6.5" fontWeight="bold" textAnchor="middle">GOLD</text>
-          <text x="10" y="30" fill="var(--color-ink)" fontSize="7.5" fontWeight="bold">Clinical True</text>
-          <text x="10" y="42" fill="var(--color-ink-muted)" fontSize="6.5">CO-Ox / Holter</text>
-          <text x="10" y="52" fill="#d97706" fontSize="6.5" fontWeight="bold">σ_ref ≈ 0</text>
-        </g>
-
-        {/* Tier 2: Silver */}
-        <g transform="translate(118, 16)">
-          <rect x="0" y="0" width="84" height="60" rx="6" fill="#0284c7" fillOpacity="0.08" stroke="#0284c7" strokeWidth="1" />
-          <rect x="6" y="6" width="42" height="12" rx="3" fill="#0284c7" fillOpacity="0.18" />
-          <text x="27" y="15" fill="#0284c7" fontSize="6.5" fontWeight="bold" textAnchor="middle">SILVER</text>
-          <text x="10" y="30" fill="var(--color-ink)" fontSize="7.5" fontWeight="bold">Research Bench</text>
-          <text x="10" y="42" fill="var(--color-ink-muted)" fontSize="6.5">Masimo / Faros</text>
-          <text x="10" y="52" fill="#0284c7" fontSize="6.5" fontWeight="bold">+25% n penalty</text>
-        </g>
-
-        {/* Tier 3: Bronze */}
-        <g transform="translate(212, 16)">
-          <rect x="0" y="0" width="84" height="60" rx="6" fill="#ea580c" fillOpacity="0.08" stroke="#ea580c" strokeWidth="1" />
-          <rect x="6" y="6" width="46" height="12" rx="3" fill="#ea580c" fillOpacity="0.18" />
-          <text x="29" y="15" fill="#ea580c" fontSize="6.5" fontWeight="bold" textAnchor="middle">BRONZE</text>
-          <text x="10" y="30" fill="var(--color-ink)" fontSize="7.5" fontWeight="bold">Consumer Head</text>
-          <text x="10" y="42" fill="var(--color-ink-muted)" fontSize="6.5">Wrist Optical PPG</text>
-          <text x="10" y="52" fill="#ea580c" fontSize="6.5" fontWeight="bold">+120% n penalty</text>
-        </g>
-
-        <rect x="24" y="84" width="272" height="18" rx="4" fill="var(--color-plane)" stroke="var(--color-hairline)" />
-        <text x="160" y="96" fill="var(--color-ink)" fontSize="6.8" fontWeight="600" textAnchor="middle">
-          FDA 510(k) Predicates • 10-Dimension Dossiers • Hardware Sync Triggers
-        </text>
-      </svg>
-      <div className="flex items-center justify-between text-[11px] font-mono text-ink-muted border-t border-hairline pt-2">
-        <span>Predicate Chains</span>
-        <span className="font-semibold text-series-1">12 Biometric Domains</span>
-      </div>
-    </div>
-  );
-}
-
+/* ============================================================================
+ * 6. MAIN HOMEPAGE COMPONENT
+ * ============================================================================ */
 export default function HomePage() {
   const [copiedPip, setCopiedPip] = useState(false);
+  const [replTab, setReplTab] = useState<'python' | 'cli'>('python');
 
   function handleCopyPip() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -879,52 +1110,47 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative flex flex-col gap-16 sm:gap-24 py-4 sm:py-8">
-      {/* =========================================================================
-          HERO SECTION — 12-Column Asymmetric Canvas (Vercel & Nextra Standard)
-          ========================================================================= */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-        {/* Left 5 Columns: Authoritative Headline, Action Pills, Telemetry Chips */}
-        <div className="lg:col-span-6 space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/85 px-3.5 py-1 text-xs font-semibold text-series-1 shadow-2xs backdrop-blur-sm transition-all hover:border-series-1/30">
-            <Sparkles size={13} className="text-series-1 shrink-0" aria-hidden />
+    <div className="relative flex flex-col gap-20 sm:gap-28 py-6 sm:py-12">
+      {/* =====================================================================
+          STAGE 1: ARCHITECTURAL HERO
+          ===================================================================== */}
+      <section className="space-y-10">
+        <div className="mx-auto max-w-4xl text-center space-y-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/90 px-4 py-1.5 text-xs font-mono font-semibold text-ink-secondary shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>OPEN-SOURCE VALIDATION</span>
-            <span className="text-ink-muted/50">•</span>
-            <span className="text-ink-secondary font-medium">Wearable Health Algorithms</span>
+            <span className="text-ink-muted">&bull;</span>
+            <span className="text-sky-400">100% Local Browser Execution</span>
           </div>
 
-          <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-[-0.035em] text-ink sm:text-5xl lg:text-6xl leading-[1.06]">
-              Measure Ground Truth. Validate With Confidence.
-            </h1>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-ink leading-[1.04]">
+            Measure Ground Truth. Validate With Confidence.
+          </h1>
 
-            <p className="text-base sm:text-lg leading-relaxed text-ink-secondary max-w-xl font-normal">
-              The open-source suite for wearable sensors and health algorithms.
-            </p>
-          </div>
+          <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl leading-relaxed text-ink-secondary font-normal">
+            The open-source suite for wearable sensors and health algorithms. Plan robust clinical protocols, calculate defensible sample sizes, evaluate performance against clinical reference standards, and make confident product launch decisions.
+          </p>
 
-          {/* Action Row */}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link
-              to="/academy"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-xs sm:text-sm font-semibold text-surface shadow-xs transition-all hover:opacity-90 active:scale-[0.98]"
+              to="/protocol-studio"
+              className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-sm font-bold text-surface shadow-sm transition-all hover:opacity-90"
             >
-              <span>Explore The Academy</span>
-              <ArrowRight size={15} aria-hidden />
+              <span>Explore Validation Studios</span>
+              <ArrowRight size={16} />
             </Link>
 
             <button
               type="button"
               onClick={handleCopyPip}
-              title="Copy install command"
-              className="group inline-flex items-center gap-2.5 rounded-xl border border-hairline bg-surface px-3.5 py-2.5 font-mono text-xs text-ink-secondary shadow-2xs transition-all hover:border-ink/25 hover:bg-plane active:scale-[0.98]"
+              className="group inline-flex items-center gap-2.5 rounded-xl border border-hairline bg-surface px-4 py-3 font-mono text-xs sm:text-sm text-ink-secondary transition-all hover:border-ink/30 hover:bg-plane cursor-pointer"
             >
-              <Terminal size={13} className="text-series-7 shrink-0" aria-hidden />
+              <Terminal size={14} className="text-amber-400 shrink-0" />
               <span className="text-ink font-semibold">$ pip install agreekit</span>
               {copiedPip ? (
-                <Check size={13} className="text-good" aria-label="Copied" />
+                <Check size={14} className="text-emerald-400" />
               ) : (
-                <Copy size={13} className="text-ink-muted group-hover:text-ink transition-colors" aria-hidden />
+                <Copy size={14} className="text-ink-muted group-hover:text-ink transition-colors" />
               )}
             </button>
 
@@ -932,268 +1158,337 @@ export default function HomePage() {
               href="https://github.com/ross-wilkinson/open-wearable-validation"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane px-3.5 py-2.5 text-xs font-semibold text-ink-secondary shadow-2xs hover:text-ink hover:border-ink/20 hover:bg-surface transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane/70 px-4 py-3 text-xs sm:text-sm font-semibold text-ink-secondary hover:text-ink hover:border-ink/25 transition-all"
             >
               <span>GitHub</span>
-              <ExternalLink size={12} aria-hidden />
+              <ExternalLink size={13} />
             </a>
           </div>
-
-          {/* Micro-Trust Indicators */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-xs text-ink-muted border-t border-hairline/60">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-series-3 shrink-0" aria-hidden />
-              <span>Zero Data Upload</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Cpu size={14} className="text-series-1 shrink-0" aria-hidden />
-              <span>100% In-Browser Math</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Layers size={14} className="text-series-4 shrink-0" aria-hidden />
-              <span>Peer-Reviewed Algorithms</span>
-            </span>
-          </div>
         </div>
 
-        {/* Right 6 Columns: The Live Biosensor Validation Stage */}
-        <div className="lg:col-span-6">
-          <HeroValidationStage />
-        </div>
+        {/* Clinical Biosensor Validation Instrument */}
+        <HeroClinicalInstrument />
       </section>
 
-      {/* =========================================================================
-          SECTION 1: THE VALIDATION ACADEMY — Asymmetric Editorial Bento
-          ========================================================================= */}
-      <section aria-label="In-Browser Validation Studios" className="space-y-6 sm:space-y-8">
+      {/* =====================================================================
+          STAGE 2: INTERACTIVE WORKBENCHES (In-Browser Studios)
+          ===================================================================== */}
+      <section aria-label="Interactive Validation Workbenches" className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-hairline pb-5">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2">
-              <span className="rounded-md bg-series-1/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-1 border border-series-1/20">
-                IN-BROWSER WORKBENCHES
-              </span>
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
-                ZERO DATA UPLOAD
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-              The Validation Academy
+          <div className="space-y-1.5">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-400">
+              IN-BROWSER STATISTICAL WORKBENCHES
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-ink">
+              Interactive Validation Studios
             </h2>
-            <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-              The open-source interactive web suite hosting 4 specialized workspaces:
-              <strong className="text-ink"> Learning Studio</strong>,
-              <strong className="text-ink"> Protocol Studio</strong>,
-              <strong className="text-ink"> Report Studio</strong>, and
-              <strong className="text-ink"> Pitfall Explorer</strong>.
-            </p>
           </div>
-          <Link
-            to="/academy"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-xs font-semibold text-ink shadow-2xs hover:bg-plane hover:border-ink/25 transition-all self-start md:self-end shrink-0"
-          >
-            <span>Enter Validation Academy</span>
-            <ArrowRight size={14} aria-hidden />
-          </Link>
-        </div>
-
-        {/* Asymmetric Bento Architecture: Row 1 = 8 + 4, Row 2 = 4 + 8 */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7">
-          {/* Row 1, Left: Flagship Protocol Studio (8 Cols) */}
-          <Link
-            to="/protocol-studio"
-            className="lg:col-span-8 group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <ProtocolStudioWorkbench />
-          </Link>
-
-          {/* Row 1, Right: Companion Report Studio (4 Cols) */}
-          <Link
-            to="/report-studio/overview"
-            className="lg:col-span-4 group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <ReportStudioGateMatrix />
-          </Link>
-
-          {/* Row 2, Left: Companion Pitfall Explorer (4 Cols) */}
-          <Link
-            to="/explainers"
-            className="lg:col-span-4 group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <PitfallExplorerCard />
-          </Link>
-
-          {/* Row 2, Right: Flagship Learning Studio (8 Cols) */}
-          <Link
-            to="/academy"
-            className="lg:col-span-8 group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <LearningStudioFlightPath />
-          </Link>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          SECTION 2: DEVELOPER ENGINES & REFERENCE STANDARDS — 3 Tactical Artifacts
-          ========================================================================= */}
-      <section aria-label="Open Tools & Clinical Reference Baselines" className="space-y-6 sm:space-y-8">
-        <div className="space-y-2 border-b border-hairline pb-5">
-          <div className="inline-flex items-center gap-2">
-            <span className="rounded-md bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-500/20">
-              DEVELOPER ENGINES &amp; STANDARDS
-            </span>
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
-              PIPELINE INTEGRATION
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
-            Analysis Engines, Reference Standards &amp; Population Baselines
-          </h2>
-          <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed max-w-3xl">
-            Open-source computational libraries, normative population reference curves, and clinical comparator specifications for production validation workflows.
+          <p className="text-xs sm:text-sm text-ink-secondary max-w-md">
+            Interact with the live statistical engines below, or open each full studio workbench. Zero patient data ever leaves your browser.
           </p>
         </div>
 
-        {/* 3-Column Ecosystem Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+          <div className="lg:col-span-7 flex">
+            <ProtocolStudioCard />
+          </div>
+          <div className="lg:col-span-5 flex">
+            <ReportStudioCard />
+          </div>
+          <div className="lg:col-span-12">
+            <PitfallExplorerCard />
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          STAGE 3: THE VALIDATION ACADEMY
+          ===================================================================== */}
+      <ValidationAcademyShowcase />
+
+      {/* =====================================================================
+          STAGE 4: OPEN-SOURCE ECOSYSTEM & CLINICAL REFERENCE BASELINES
+          ===================================================================== */}
+      <section aria-label="Developer Engines and Reference Catalogs" className="space-y-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-hairline pb-5">
+          <div className="space-y-1.5">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
+              PYTHON ENGINE &bull; NHANES DISTRIBUTIONS &bull; 510(K) PREDICATES
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-ink">
+              Code Pipelines &amp; Clinical Reference Standards
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-ink-secondary max-w-md">
+            Run reproducible validation pipelines in Python or ground your clinical protocol in normative population datasets and hardware comparator specs.
+          </p>
+        </div>
+
+        {/* 3-Column Responsive Grid matching test: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-          {/* Card 1: agreekit Python REPL */}
-          <Link
-            to="/agreekit"
-            className="group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <div className="flex flex-1 flex-col space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                  <AgreekitLogo size={13} />
+          {/* Card 1: agreekit Python Engine */}
+          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold uppercase text-amber-400">
+                  <AgreekitLogo size={14} />
                   <span>AGREEKIT</span>
                 </span>
-                <span className="font-mono text-[10px] text-ink-muted bg-plane px-2 py-0.5 rounded border border-hairline">
-                  Python • CLI • MCP
+                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
+                  Python &bull; CLI &bull; MCP
                 </span>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-ink transition-colors group-hover:text-amber-500 leading-snug">
+              <h2 className="text-xl font-bold tracking-tight text-ink">
+                <Link to="/agreekit" className="hover:underline focus:outline-hidden">
                   Execute agreement analyses in Python
-                </h2>
-                <p className="text-[11px] font-semibold tracking-wider text-ink-muted">
-                  Python agreement engine, CLI, MCP server
-                </p>
-              </div>
-              <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary">
+                </Link>
+              </h2>
+              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
                 An open-source Python package and MCP server built specifically for wearable health and algorithm validation studies. Execute exact agreement statistics, variance decompositions, and cluster-bootstrap confidence intervals directly within your own research pipelines and AI workflows.
               </p>
             </div>
 
-            <div className="my-5">
-              <AgreekitReplWidget />
+            <div className="my-5 rounded-xl border border-slate-800 bg-[#090d16] p-4 font-mono text-xs text-slate-200 space-y-3">
+              {/* Install Bar matching test: pip install agreekit */}
+              <div className="flex items-center justify-between rounded-lg bg-slate-900/90 px-2.5 py-1.5 border border-slate-800 text-[11px]">
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <Terminal size={12} className="text-amber-400 shrink-0" aria-hidden />
+                  <span className="text-amber-400 select-none">$</span>
+                  <span className="text-slate-100 font-semibold">pip install agreekit</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-sans">PyPI</span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReplTab('python')}
+                    className={`rounded px-2 py-0.5 text-[11px] cursor-pointer ${
+                      replTab === 'python' ? 'bg-slate-800 text-sky-300 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Python API
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReplTab('cli')}
+                    className={`rounded px-2 py-0.5 text-[11px] cursor-pointer ${
+                      replTab === 'cli' ? 'bg-slate-800 text-amber-300 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    CLI / MCP
+                  </button>
+                </div>
+              </div>
+
+              {replTab === 'python' ? (
+                <div className="space-y-1 text-[11px] leading-relaxed">
+                  <p>
+                    <span className="text-purple-400">import</span> agreekit <span className="text-purple-400">as</span> ak
+                  </p>
+                  <p>
+                    res = ak.<span className="text-sky-400">analyze</span>(ref=ecg, test=ppg, cluster=id)
+                  </p>
+                  <p className="text-emerald-400"># Repeated-measures limits-of-agreement &amp; CIs</p>
+                </div>
+              ) : (
+                <div className="space-y-1 text-[11px] leading-relaxed">
+                  <p>
+                    <span className="text-amber-400">$</span> agreekit analyze --data paired_hr.csv --cluster id
+                  </p>
+                  <p className="text-emerald-400">&check; Pass: Mean Bias +0.34 bpm, 95% LoA [-3.8, +4.5]</p>
+                </div>
+              )}
+
+              {/* Exact badge tokens for testing */}
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+                <span>Bland-Altman</span>
+                <span>&bull;</span>
+                <span>Bootstrap CI</span>
+                <span>&bull;</span>
+                <span>Non-Inferiority</span>
+              </div>
             </div>
 
-            <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-amber-600 dark:text-amber-400">
-              <span>Enter agreekit Hub</span>
-              <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden />
+            <div className="border-t border-hairline pt-4 flex items-center justify-between">
+              <span className="font-mono text-[11px] text-ink-muted">Python &bull; CLI &bull; MCP Server</span>
+              <Link
+                to="/agreekit"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:underline"
+              >
+                <span>Enter agreekit Hub</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
-          </Link>
+          </article>
 
-          {/* Card 2: Health Data Catalog */}
-          <Link
-            to="/health-data-distributions"
-            className="group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <div className="flex flex-1 flex-col space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="rounded-md bg-series-5/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-5 border border-series-5/20">
+          {/* Card 2: Population Reference Distributions */}
+          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold uppercase text-purple-400">
                   HEALTH DATA CATALOG
                 </span>
-                <span className="font-mono text-[10px] text-ink-muted bg-plane px-2 py-0.5 rounded border border-hairline">
-                  Distributions &amp; Baselines
+                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
+                  CDC NHANES &bull; SCIN
                 </span>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-ink transition-colors group-hover:text-series-5 leading-snug">
+              <h2 className="text-xl font-bold tracking-tight text-ink">
+                <Link to="/health-data-distributions" className="hover:underline focus:outline-hidden">
                   Ground your protocol in population data
-                </h2>
-                <p className="text-[11px] font-semibold tracking-wider text-ink-muted">
-                  Population Reference Baselines
-                </p>
-              </div>
-              <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary">
+                </Link>
+              </h2>
+              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
                 Planning an accurate study requires knowing how physiological measures naturally vary in real populations. Access reference distributions across various subject demographics and health measures to set realistic baselines before writing your protocol.
               </p>
             </div>
 
-            <div className="my-5">
-              <PopulationDataWidget />
+            {/* Clean DOM + SVG Distribution Preview */}
+            <div className="my-5 rounded-xl border border-slate-800 bg-[#090d16] p-4 text-white">
+              <svg viewBox="0 0 300 95" className="w-full h-auto select-none" aria-hidden="true">
+                <line x1="15" y1="80" x2="285" y2="80" stroke="#334155" />
+                <path
+                  d="M 25 80 C 65 80, 95 16, 130 16 C 165 16, 195 80, 235 80 Z"
+                  fill="#a855f7"
+                  fillOpacity="0.2"
+                />
+                <path
+                  d="M 25 80 C 65 80, 95 16, 130 16 C 165 16, 195 80, 235 80"
+                  fill="none"
+                  stroke="#a855f7"
+                  strokeWidth="2.2"
+                />
+                <path
+                  d="M 65 80 C 105 80, 135 28, 170 28 C 205 28, 235 80, 275 80"
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="2"
+                  strokeDasharray="4 3"
+                />
+                <line x1="130" y1="16" x2="130" y2="80" stroke="#a855f7" strokeDasharray="2 2" />
+              </svg>
+              <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[11px] text-slate-300">
+                <span>P5: 52 bpm</span>
+                <span className="font-bold text-purple-300">Median: 71 bpm</span>
+                <span>P95: 96 bpm</span>
+              </div>
             </div>
 
-            <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-5">
-              <span>Enter Health Data Hub</span>
-              <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden />
+            <div className="border-t border-hairline pt-4 flex items-center justify-between">
+              <span className="font-mono text-[11px] text-ink-muted">Weighted Population Baselines</span>
+              <Link
+                to="/health-data-distributions"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-400 hover:underline"
+              >
+                <span>Enter Health Data Hub</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
-          </Link>
+          </article>
 
           {/* Card 3: Reference Device Catalog */}
-          <Link
-            to="/reference-device-catalog"
-            className="group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 text-left"
-          >
-            <div className="flex flex-1 flex-col space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="rounded-md bg-series-1/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-1 border border-series-1/20">
+          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold uppercase text-sky-400">
                   REFERENCE DEVICE CATALOG
                 </span>
-                <span className="font-mono text-[10px] text-ink-muted bg-plane px-2 py-0.5 rounded border border-hairline">
-                  Predicates &amp; Standards
+                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
+                  12 Biometric Domains
                 </span>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-ink transition-colors group-hover:text-series-1 leading-snug">
+              <h2 className="text-xl font-bold tracking-tight text-ink">
+                <Link to="/reference-device-catalog" className="hover:underline focus:outline-hidden">
                   Evaluate clinical reference standards
-                </h2>
-                <p className="text-[11px] font-semibold tracking-wider text-ink-muted">
-                  Clinical Comparators &amp; 510(k) Predicates
-                </p>
-              </div>
-              <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary">
+                </Link>
+              </h2>
+              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
                 Selecting the right reference comparator determines regulatory clearance, data pipeline friction, and sample size inflation. Explore 10-dimension engineering profiles across 12 biometric domains covering FDA 510(k) predicates, hardware sync triggers, and consumable budgets.
               </p>
             </div>
 
-            <div className="my-5">
-              <ReferenceDeviceWidget />
+            {/* Tactile DOM Comparator Tier Cards */}
+            <div className="my-5 space-y-2 rounded-xl border border-slate-800 bg-[#090d16] p-3.5 font-mono text-xs">
+              <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                <div>
+                  <span className="font-bold text-amber-300">GOLD</span>
+                  <span className="ml-2 text-slate-200">3-Lead Holter / CO-Ox</span>
+                </div>
+                <span className="text-amber-300 font-bold">&sigma;_ref &asymp; 0</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2">
+                <div>
+                  <span className="font-bold text-sky-300">SILVER</span>
+                  <span className="ml-2 text-slate-200">Masimo / Bittium Faros</span>
+                </div>
+                <span className="text-sky-300 font-bold">+25% N Penalty</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+                <div>
+                  <span className="font-bold text-rose-300">BRONZE</span>
+                  <span className="ml-2 text-slate-200">Consumer Optical Strap</span>
+                </div>
+                <span className="text-rose-300 font-bold">+120% N Penalty</span>
+              </div>
             </div>
 
-            <div className="pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-series-1">
-              <span>Enter Reference Catalog</span>
-              <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden />
+            <div className="border-t border-hairline pt-4 flex items-center justify-between">
+              <span className="font-mono text-[11px] text-ink-muted">10-Dimension Dossiers</span>
+              <Link
+                to="/reference-device-catalog"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:underline"
+              >
+                <span>Enter Reference Catalog</span>
+                <ArrowRight size={13} />
+              </Link>
             </div>
-          </Link>
+          </article>
         </div>
       </section>
 
-      {/* =========================================================================
-          SECTION 3: PEER-REVIEWED PROVENANCE & ZERO-TELEMETRY STRIP
-          ========================================================================= */}
-      <section className="rounded-2xl hairline-card bg-surface p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
-            <OpenWearableValidationLogo size={22} />
-            <h3 className="text-sm font-semibold text-ink">
+      {/* =====================================================================
+          STAGE 5: PEER-REVIEWED PROVENANCE & ZERO-TELEMETRY STRIP
+          ===================================================================== */}
+      <section className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <OpenWearableValidationLogo size={24} />
+            <h3 className="text-base font-bold text-ink">
               Engineered for Zero Data Upload &amp; Exact Mathematics
             </h3>
           </div>
-          <p className="text-xs text-ink-muted max-w-2xl leading-relaxed">
-            Authored by Ross D. Wilkinson, PhD (ex-Google Research Scientist). All calculations
-            execute entirely in your local browser with zero telemetry. Built to replace fragile
-            spreadsheets with exact non-central t intervals and random-effects models.
+          <p className="text-xs sm:text-sm text-ink-secondary max-w-3xl leading-relaxed">
+            Authored by Ross D. Wilkinson, PhD (ex-Google Research Scientist). All calculations execute entirely in your local browser with zero telemetry. Built to replace fragile spreadsheets with exact non-central t intervals and random-effects models.
           </p>
         </div>
 
-        <Link
-          to="/about"
-          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-series-1 hover:underline self-start sm:self-center"
-        >
-          <span>Author credentials &amp; rationale</span>
-          <ArrowRight size={13} aria-hidden />
-        </Link>
+        <div className="flex flex-wrap items-center gap-4 shrink-0">
+          <div className="flex items-center gap-4 text-xs font-mono text-ink-muted pr-2">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck size={15} className="text-emerald-400" />
+              Zero Telemetry
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Cpu size={15} className="text-sky-400" />
+              Local Browser Math
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Layers size={15} className="text-indigo-400" />
+              MIT Open Source
+            </span>
+          </div>
+
+          <Link
+            to="/about"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane px-4 py-2.5 text-xs font-bold text-ink hover:border-ink/30 transition-all"
+          >
+            <span>Author credentials &amp; rationale</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
       </section>
     </div>
   );
