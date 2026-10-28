@@ -7,10 +7,11 @@
 export const BRAND_CONFIG = {
   /**
    * Umbrella Site Brand Name.
-   * Parameterized to easily update once the final name replaces 'OpenValidation'.
    */
   siteName: 'Open Wearable Validation',
   shortName: 'Open Wearable Validation',
+  domain: 'openwearablevalidation.org',
+  url: 'https://openwearablevalidation.org',
   heroHeadline: 'Measure Ground Truth. Validate With Confidence.',
   heroSubheadline: 'The open-source suite for wearable sensors and health algorithms.',
   eyebrow: 'OPEN-SOURCE VALIDATION',

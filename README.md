@@ -1,67 +1,88 @@
-# Validation Study Designer
+# Open Wearable Validation
 
-A browser-based toolkit for designing measurement-validation studies — the kind
-run to prove a wearable, sensor, or algorithm is accurate enough.
+**Measure Ground Truth. Validate With Confidence.**
 
-**Live:** https://ross-wilkinson.github.io/validation-study-designer/
+The open-source suite for wearable sensors and health algorithms.
 
-G\*Power and its clones cover classical power analysis (t-tests, ANOVA) and stop
-there. Validation work runs on *agreement* statistics — bias, limits of
-agreement, percentile error — and there is no free tool for sizing a study
-around those. This is that calculation.
+**Live:** [https://openwearablevalidation.org](https://openwearablevalidation.org)  
+**GitHub:** [github.com/ross-wilkinson/open-wearable-validation](https://github.com/ross-wilkinson/open-wearable-validation)
 
-Everything runs client-side. No data is uploaded, stored, or sent anywhere.
+---
 
-## Modules
+G\*Power and its clones cover classical power analysis (t-tests, ANOVA) and stop there. Validation work runs on *agreement* statistics — bias, limits of agreement, variance decomposition, percentile error, and non-inferiority margins — and there has been no free, comprehensive tool for sizing and reporting studies around those. **Open Wearable Validation** is that suite.
 
-| Module | Question it answers |
-|---|---|
-| **Precision vs sample size** | At n subjects, how tightly is each reported quantity pinned down? |
-| **Sample size for agreement** | How many subjects to reach a stated accuracy threshold? Plus an equivalence test. |
-| **Demographic planner** | Minimum *and maximum* subjects per segment — the cap is what makes the floor reachable. |
-| **Timeline simulator** | Monte Carlo over study phases, with a distribution choice per phase. |
-| **Effect size intervals** | Cohen's d confidence intervals from the non-central t, not a normal approximation. |
+Everything runs entirely client-side. No data is uploaded, stored, or sent anywhere.
 
-Plus two explainers: *Misled by RMSE and MAE*, and *Agreement is not ICC*.
+---
 
-## How the numbers are verified
+## The 4 Pillars
 
-The browser has no SciPy, so every distribution — normal, Student t,
-half-normal, Poisson, non-central t — is implemented from scratch in
-TypeScript. Hand-rolled special functions are subtly wrong by default, so each
-is tested against golden values generated from SciPy across thousands of grid
-points. `tools/generate_fixtures.py` emits those fixtures; `tools/check_fixtures.py`
-regenerates them in CI and fails if any committed value drifted, which is the only
-way a quietly edited expected value gets caught. It compares values rather than
-file bytes, at per-array tolerances that mirror the test consuming each array —
-a guard stricter than the test it guards reports differences that cannot change
-any outcome, and across two operating systems there are thousands of those.
-SciPy and NumPy are pinned to exact versions so the reference implementation
-changes only in a commit that says it is changing.
+1. **The Validation Academy** (`/academy`)  
+   Interactive Wearable Validation Studios:
+   - **Learning Studio:** Meridian PulseBand 2 case study following an 8-module product journey from prototyping to multi-year audits.
+   - **Protocol Studio:** Study design, limits-of-agreement precision, repeated-measures ANOVA, demographic quota planning, and Monte Carlo timelines.
+   - **Report Studio:** Decision scorecards, Bland-Altman agreement with subject clusters, absolute error survival distributions, and bivariate launch planes.
+   - **Pitfall Explorer:** Statistical hazard explainers (RMSE/MAE distortion, Agreement vs ICC, N=5 sniff test traps).
 
-Two places where the reference turned out to be the less accurate side are
-documented in the code and graded against exact arithmetic instead:
-`scipy.special.betaln` (which cancels for lopsided arguments) and `nct.cdf`
-(which returns NaN in the deep tail).
+2. **agreekit** (`/agreekit`)  
+   Python agreement engine, CLI, and MCP server for exact limits of agreement, Bland-Altman variance decomposition, and paired non-inferiority testing.
+
+3. **Health Data Catalog** (`/health-data-distributions`)  
+   Normative baseline population reference distributions from CDC NHANES and SCIN datasets across diverse demographics and health metrics.
+
+4. **Reference Device Catalog** (`/reference-device-catalog`)  
+   10-dimension comparative dossiers across 12 biometric domains evaluating FDA 510(k) predicates, hardware synchronization triggers, and sample size inflation from reference noise.
+
+---
+
+## Interactive Protocol & Analysis Modules
+
+| Module | Route | Question it answers |
+|---|---|---|
+| **Reference Standards** | `/reference-devices` | Which clinical reference standard should I validate against? |
+| **Sample Size (Agreement)** | `/agreement` | How many participants do I need to prove agreement or non-inferiority? |
+| **Repeated Measures** | `/repeated-measures` | How do I balance participants vs replicates with clustered data? |
+| **Precision vs Sample Size** | `/precision` | At $n$ participants, how tightly is each reported quantity pinned down? |
+| **Demographic Planner** | `/demographics` | What quotas per sex, age band, and Fitzpatrick/Monk skin tone ensure reachability? |
+| **Timeline Simulator** | `/timeline` | How long will recruitment and data collection take (Monte Carlo simulation)? |
+| **Effect Size Intervals** | `/effect-size` | What is the exact confidence interval for Cohen's d using non-central t? |
+| **Report Studio** | `/report-studio` | How do I synthesize findings into FDA-defensible scorecards and bivariate launch planes? |
+| **Pass by Chance?** | `/chance-kpi` | Did our algorithms pass KPIs by chance due to narrow reference dynamic range? |
+
+---
+
+## How the Numbers are Verified
+
+The browser has no SciPy, so every statistical distribution — normal, Student's $t$, half-normal, Poisson, and non-central $t$ — is implemented from scratch in pure TypeScript.
+
+Hand-rolled special functions are verified against golden values generated from SciPy across thousands of grid points. `tools/generate_fixtures.py` emits those fixtures; `tools/check_fixtures.py` verifies them in CI. SciPy and NumPy versions are pinned to guarantee strict numerical reproducibility.
+
+---
 
 ## Development
 
-```sh
+```bash
 npm install
-npm run dev        # dev server
-npm test           # vitest
-npm run lint
-npm run typecheck
-npm run build
-npm run preview    # serves dist/ at the real base path
-npm run fixtures   # regenerate golden fixtures (needs Python + SciPy)
+npm run dev        # Vite dev server
+npm test           # Vitest (45 test suites, 445 tests)
+npm run lint       # ESLint 9
+npm run typecheck  # TypeScript strict typecheck
+npm run build      # Production build (Vite + tsc)
+npm run preview    # Preview production build locally
+npm run fixtures   # Regenerate golden fixtures (Python + SciPy)
 ```
 
-`base` in `vite.config.ts` must match the GitHub repository name.
+---
+
+## Deployment
+
+The application is deployed on **Vercel** with clean URLs:
+- Root base path in `vite.config.ts`: `base: '/'`
+- SPA rewrites for client-side deep linking in `vercel.json`
+- Router powered by `BrowserRouter` (no hash fragments)
+
+---
 
 ## Credits
 
-Built by [Ross D. Wilkinson, PhD](https://scholar.google.com/citations?user=y39yme4AAAAJ&hl=en).
-The methods are ported from working notebooks written for real validation
-studies. Where those notebooks contained errors, they were corrected rather than
-ported, and each module says which — see `HOWTO.md`.
+Created by **[Ross D. Wilkinson, PhD](https://scholar.google.com/citations?user=y39yme4AAAAJ&hl=en)**, former Research Scientist at Google specializing in biometric algorithm validation for Pixel Watch, with multiple FDA 510(k) clearances.
