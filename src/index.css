@@ -121,6 +121,34 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Coordinate dot matrix canvas inspired by Vercel & precision instrumentation */
+.bg-grid-pattern {
+  background-image: radial-gradient(var(--color-hairline) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Sub-pixel hairline border system eliminating box-model jitter */
+.hairline-card {
+  box-shadow: 0 0 0 1px var(--color-hairline), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.hairline-card-interactive {
+  box-shadow: 0 0 0 1px var(--color-hairline), 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hairline-card-interactive:hover {
+  box-shadow: 0 0 0 1px rgba(11, 11, 11, 0.22), 0 12px 28px -6px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme='dark'] .hairline-card-interactive:hover,
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .hairline-card-interactive:hover {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 12px 28px -6px rgba(0, 0, 0, 0.45);
+  }
 }
 
 /* Axis ticks and table figures must align vertically; standalone display

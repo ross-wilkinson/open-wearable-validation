@@ -825,16 +825,14 @@ const ACADEMY_WORKSPACES: AcademyWorkspaceTile[] = [
   },
 ];
 
-interface EcosystemPillarTile {
+interface EcosystemToolTile {
   id: string;
-  pillarNumber: string;
   name: string;
   eyebrow: string;
   tagline: string;
   title: string;
   subtitle: string;
   destination: string;
-  isExternal: boolean;
   actionLabel: string;
   badgeClass: string;
   hoverTitleClass: string;
@@ -843,10 +841,9 @@ interface EcosystemPillarTile {
   Visual: () => React.ReactNode;
 }
 
-const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
+const ECOSYSTEM_TOOLS: EcosystemToolTile[] = [
   {
     id: 'agreekit',
-    pillarNumber: 'PILLAR 02',
     name: 'agreekit',
     eyebrow: 'AGREEKIT',
     tagline: 'Python agreement engine, CLI, MCP server',
@@ -854,7 +851,6 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
     subtitle:
       'An open-source Python package and MCP server built specifically for wearable health and algorithm validation studies. Execute exact agreement statistics, variance decompositions, and cluster-bootstrap confidence intervals directly within your own research pipelines and AI workflows.',
     destination: '/agreekit',
-    isExternal: false,
     actionLabel: 'Enter agreekit Hub',
     badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
     hoverTitleClass: 'group-hover:text-amber-600 dark:group-hover:text-amber-400',
@@ -864,7 +860,6 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
   },
   {
     id: 'health-data',
-    pillarNumber: 'PILLAR 03',
     name: 'Health Data Catalog',
     eyebrow: 'HEALTH DATA CATALOG',
     tagline: 'Population Reference Baselines',
@@ -872,7 +867,6 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
     subtitle:
       'Planning an accurate study requires knowing how physiological measures naturally vary in real populations. Access reference distributions across various subject demographics and health measures to set realistic baselines before writing your protocol.',
     destination: '/health-data-distributions',
-    isExternal: false,
     actionLabel: 'Enter Health Data Hub',
     badgeClass: 'bg-series-5/10 text-series-5 border border-series-5/20',
     hoverTitleClass: 'group-hover:text-series-5',
@@ -882,7 +876,6 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
   },
   {
     id: 'reference-device-catalog',
-    pillarNumber: 'PILLAR 04',
     name: 'Reference Device Catalog',
     eyebrow: 'REFERENCE DEVICE CATALOG',
     tagline: 'Clinical Comparators & 510(k) Predicates',
@@ -890,7 +883,6 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
     subtitle:
       'Selecting the right reference comparator determines regulatory clearance, data pipeline friction, and sample size inflation. Explore 10-dimension engineering profiles across 12 biometric domains covering FDA 510(k) predicates, hardware sync triggers, and consumable budgets.',
     destination: '/reference-device-catalog',
-    isExternal: false,
     actionLabel: 'Enter Reference Catalog',
     badgeClass: 'bg-series-1/10 text-series-1 border border-series-1/20',
     hoverTitleClass: 'group-hover:text-series-1',
@@ -916,27 +908,27 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-12 sm:gap-16 py-3 sm:py-6">
-      {/* Hero Section — Inspired by Vercel & Nextra minimalism */}
+    <div className="relative flex flex-col gap-14 sm:gap-20 py-4 sm:py-8">
+      {/* Hero Section — Minimalist, Authoritative, Developer-Focused */}
       <section className="space-y-6 max-w-4xl">
-        <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/80 px-3.5 py-1 text-xs font-semibold text-series-1 shadow-2xs backdrop-blur-sm transition-all hover:border-series-1/30">
+        <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/85 px-3.5 py-1 text-xs font-semibold text-series-1 shadow-2xs backdrop-blur-sm transition-all hover:border-series-1/30">
           <Sparkles size={13} className="text-series-1 shrink-0" aria-hidden />
           <span>OPEN-SOURCE VALIDATION</span>
-          <span className="text-ink-muted">•</span>
+          <span className="text-ink-muted/50">•</span>
           <span className="text-ink-secondary font-medium">Wearable Health Algorithms</span>
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-5xl leading-tight">
+          <h1 className="text-4xl font-extrabold tracking-[-0.035em] text-ink sm:text-5xl lg:text-6xl leading-[1.08] max-w-4xl">
             Measure Ground Truth. Validate With Confidence.
           </h1>
 
-          <p className="text-base sm:text-lg leading-relaxed text-ink-secondary max-w-3xl">
+          <p className="text-base sm:text-lg leading-relaxed text-ink-secondary max-w-3xl font-normal">
             The open-source suite for wearable sensors and health algorithms.
           </p>
         </div>
 
-        {/* Quick Launch & Developer Actions */}
+        {/* Action Row — High Contrast & Interactive */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Link
             to="/academy"
@@ -972,8 +964,8 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* High-craft Trust Indicators — Inspired by Family.co */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 text-xs text-ink-muted border-t border-hairline/60">
+        {/* Micro-Trust Indicators — Pure Engineering Restraint */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-xs text-ink-muted border-t border-hairline/60">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck size={14} className="text-series-3 shrink-0" aria-hidden />
             <span>Zero Data Upload</span>
@@ -984,171 +976,177 @@ export default function HomePage() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Layers size={14} className="text-series-4 shrink-0" aria-hidden />
-            <span>4 Architectural Pillars</span>
+            <span>Integrated Ecosystem</span>
           </span>
         </div>
       </section>
 
-      {/* The 4 Main Pillars Showcase — Bento Architecture */}
-      <section aria-label="Open Wearable Validation Platform Pillars" className="space-y-8 sm:space-y-10">
-        {/* Pillar 1: The Validation Academy */}
-        <div className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 space-y-6 shadow-2xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-hairline pb-5">
-            <div className="space-y-1.5 max-w-2xl">
-              <div className="inline-flex items-center gap-2">
-                <span className="rounded-md bg-series-1/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-1 border border-series-1/20">
-                  PILLAR 01
-                </span>
-                <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
-                  VALIDATION ACADEMY
-                </span>
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-                The Validation Academy
-              </h2>
-              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-                The open-source interactive web suite hosting 4 specialized workspaces:
-                <strong className="text-ink"> Learning Studio</strong>,
-                <strong className="text-ink"> Protocol Studio</strong>,
-                <strong className="text-ink"> Report Studio</strong>, and
-                <strong className="text-ink"> Pitfall Explorer</strong>.
-              </p>
+      {/* Section 1: In-Browser Validation Studios (The Validation Academy) */}
+      <section aria-label="In-Browser Validation Studios" className="space-y-6 sm:space-y-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-hairline pb-5">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2">
+              <span className="rounded-md bg-series-1/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-series-1 border border-series-1/20">
+                IN-BROWSER WORKBENCHES
+              </span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+                ZERO DATA UPLOAD
+              </span>
             </div>
-            <Link
-              to="/academy"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-plane px-4 py-2 text-xs font-semibold text-ink shadow-2xs hover:bg-surface hover:border-ink/20 transition-all self-start md:self-center shrink-0"
-            >
-              <span>Enter Validation Academy</span>
-              <ArrowRight size={14} aria-hidden />
-            </Link>
+            <h2 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+              The Validation Academy
+            </h2>
+            <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
+              The open-source interactive web suite hosting 4 specialized workspaces:
+              <strong className="text-ink"> Learning Studio</strong>,
+              <strong className="text-ink"> Protocol Studio</strong>,
+              <strong className="text-ink"> Report Studio</strong>, and
+              <strong className="text-ink"> Pitfall Explorer</strong>.
+            </p>
           </div>
-
-          {/* 4 Workspaces Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {ACADEMY_WORKSPACES.map((tile) => {
-              const cardContent = (
-                <>
-                  <div className="flex flex-1 flex-col space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded-md px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${tile.badgeClass}`}
-                      >
-                        {tile.eyebrow}
-                      </span>
-                    </div>
-                    <h2
-                      className={`text-base sm:text-lg font-bold tracking-tight text-ink transition-colors ${tile.hoverTitleClass} leading-snug`}
-                    >
-                      {tile.title}
-                    </h2>
-                    <p className="text-xs leading-relaxed text-ink-secondary">
-                      {tile.subtitle}
-                    </p>
-                  </div>
-
-                  <div className="my-4 rounded-xl border border-hairline/70 bg-plane/70 p-3 flex items-center justify-center overflow-hidden transition-colors group-hover:border-ink/20">
-                    <tile.Visual />
-                  </div>
-
-                  <div
-                    className={`pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold ${tile.actionColorClass}`}
-                  >
-                    <span>{tile.actionLabel}</span>
-                    <ArrowRight
-                      size={13}
-                      className="transition-transform group-hover:translate-x-1"
-                      aria-hidden
-                    />
-                  </div>
-                </>
-              );
-
-              const cardClassName = `group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-hairline bg-surface p-5 sm:p-6 shadow-2xs transition-all duration-200 hover:border-ink/25 hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 ${tile.focusRingClass} text-left`;
-
-              return (
-                <Link key={tile.id} to={tile.destination} className={cardClassName}>
-                  {cardContent}
-                </Link>
-              );
-            })}
-          </div>
+          <Link
+            to="/academy"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-xs font-semibold text-ink shadow-2xs hover:bg-plane hover:border-ink/25 transition-all self-start md:self-end shrink-0"
+          >
+            <span>Enter Validation Academy</span>
+            <ArrowRight size={14} aria-hidden />
+          </Link>
         </div>
 
-        {/* Pillars 2, 3, 4: Open Ecosystem Pillars */}
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              Ecosystem Pillars
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
-              Analysis Engines, Reference Standards &amp; Population Baselines
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-            {ECOSYSTEM_PILLARS.map((tile) => {
-              const cardContent = (
-                <>
-                  <div className="flex flex-1 flex-col space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded-md px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${tile.badgeClass}`}
-                      >
-                        {tile.eyebrow}
-                      </span>
-                      <span className="rounded bg-ink/5 px-2 py-0.5 text-[10px] font-bold text-ink-muted">
-                        {tile.pillarNumber}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <h2
-                        className={`text-lg sm:text-xl font-bold tracking-tight text-ink transition-colors ${tile.hoverTitleClass} leading-snug`}
-                      >
-                        {tile.title}
-                      </h2>
-                      <p className="text-[11px] font-semibold tracking-wider text-ink-muted">
-                        {tile.tagline}
-                      </p>
-                    </div>
-                    <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary">
-                      {tile.subtitle}
-                    </p>
+        {/* 4 Workspaces Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+          {ACADEMY_WORKSPACES.map((tile) => {
+            const cardContent = (
+              <>
+                <div className="flex flex-1 flex-col space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${tile.badgeClass}`}
+                    >
+                      {tile.eyebrow}
+                    </span>
                   </div>
-
-                  <div className="my-5 rounded-xl border border-hairline/70 bg-plane/70 p-3 sm:p-4 flex items-center justify-center overflow-hidden transition-colors group-hover:border-ink/20">
-                    <tile.Visual />
-                  </div>
-
-                  <div
-                    className={`pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold ${tile.actionColorClass}`}
+                  <h2
+                    className={`text-base sm:text-lg font-bold tracking-tight text-ink transition-colors ${tile.hoverTitleClass} leading-snug`}
                   >
-                    <span>{tile.actionLabel}</span>
-                    <ArrowRight
-                      size={13}
-                      className="transition-transform group-hover:translate-x-1"
-                      aria-hidden
-                    />
-                  </div>
-                </>
-              );
+                    {tile.title}
+                  </h2>
+                  <p className="text-xs leading-relaxed text-ink-secondary">
+                    {tile.subtitle}
+                  </p>
+                </div>
 
-              const cardClassName = `group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-hairline bg-surface p-6 sm:p-7 shadow-2xs transition-all duration-200 hover:border-ink/25 hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 ${tile.focusRingClass} text-left`;
+                <div className="my-4 rounded-xl border border-hairline/60 bg-plane/60 p-3 sm:p-4 flex items-center justify-center overflow-hidden transition-all duration-300 group-hover:border-ink/20 group-hover:bg-plane">
+                  <tile.Visual />
+                </div>
 
-              return (
-                <Link key={tile.id} to={tile.destination} className={cardClassName}>
-                  {cardContent}
-                </Link>
-              );
-            })}
-          </div>
+                <div
+                  className={`pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold ${tile.actionColorClass}`}
+                >
+                  <span>{tile.actionLabel}</span>
+                  <ArrowRight
+                    size={13}
+                    className="transition-transform group-hover:translate-x-1"
+                    aria-hidden
+                  />
+                </div>
+              </>
+            );
+
+            const cardClassName = `group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-5 sm:p-6 shadow-2xs hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 ${tile.focusRingClass} text-left`;
+
+            return (
+              <Link key={tile.id} to={tile.destination} className={cardClassName}>
+                {cardContent}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      {/* Minimalist Provenance Strip — Nextra/Vercel Trust Banner */}
-      <section className="rounded-2xl border border-hairline bg-surface p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-2xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <OpenWearableValidationLogo size={20} />
+      {/* Section 2: Developer Tools & Reference Standards */}
+      <section aria-label="Open Tools & Clinical Reference Baselines" className="space-y-6 sm:space-y-8">
+        <div className="space-y-2 border-b border-hairline pb-5">
+          <div className="inline-flex items-center gap-2">
+            <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              DEVELOPER ENGINES &amp; STANDARDS
+            </span>
+            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+              PIPELINE INTEGRATION
+            </span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+            Analysis Engines, Reference Standards &amp; Population Baselines
+          </h2>
+          <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed max-w-3xl">
+            Open-source computational libraries, normative population reference curves, and clinical comparator specifications for production validation workflows.
+          </p>
+        </div>
+
+        {/* 3-Column Ecosystem Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+          {ECOSYSTEM_TOOLS.map((tile) => {
+            const cardContent = (
+              <>
+                <div className="flex flex-1 flex-col space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${tile.badgeClass}`}
+                    >
+                      {tile.eyebrow}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                      {tile.name}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <h2
+                      className={`text-lg sm:text-xl font-bold tracking-tight text-ink transition-colors ${tile.hoverTitleClass} leading-snug`}
+                    >
+                      {tile.title}
+                    </h2>
+                    <p className="text-[11px] font-semibold tracking-wider text-ink-muted">
+                      {tile.tagline}
+                    </p>
+                  </div>
+                  <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary">
+                    {tile.subtitle}
+                  </p>
+                </div>
+
+                <div className="my-5 rounded-xl border border-hairline/60 bg-plane/60 p-3 sm:p-4 flex items-center justify-center overflow-hidden transition-all duration-300 group-hover:border-ink/20 group-hover:bg-plane">
+                  <tile.Visual />
+                </div>
+
+                <div
+                  className={`pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold ${tile.actionColorClass}`}
+                >
+                  <span>{tile.actionLabel}</span>
+                  <ArrowRight
+                    size={13}
+                    className="transition-transform group-hover:translate-x-1"
+                    aria-hidden
+                  />
+                </div>
+              </>
+            );
+
+            const cardClassName = `group relative flex flex-col justify-between overflow-hidden rounded-2xl hairline-card-interactive bg-surface p-6 sm:p-7 shadow-2xs hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 ${tile.focusRingClass} text-left`;
+
+            return (
+              <Link key={tile.id} to={tile.destination} className={cardClassName}>
+                {cardContent}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Section 3: Provenance & Peer-Reviewed Trust Strip */}
+      <section className="rounded-2xl hairline-card bg-surface p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <OpenWearableValidationLogo size={22} />
             <h3 className="text-sm font-semibold text-ink">
               Engineered for Zero Data Upload &amp; Exact Mathematics
             </h3>
@@ -1162,7 +1160,7 @@ export default function HomePage() {
 
         <Link
           to="/about"
-          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-series-1 hover:underline"
+          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-series-1 hover:underline self-start sm:self-center"
         >
           <span>Author credentials &amp; rationale</span>
           <ArrowRight size={13} aria-hidden />
