@@ -30,3 +30,6 @@ __pycache__/
 
 # Test/coverage output
 coverage/
+
+# Review screenshots
+screenshots/
