@@ -1,6 +1,16 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Cpu,
+  ExternalLink,
+  Layers,
+  ShieldCheck,
+  Sparkles,
+  Terminal,
+} from 'lucide-react';
 import { OpenWearableValidationLogo } from '../components/brand/OpenWearableValidationLogo.tsx';
 import { AgreekitLogo } from '../components/brand/AgreekitLogo.tsx';
 
@@ -891,25 +901,95 @@ const ECOSYSTEM_PILLARS: EcosystemPillarTile[] = [
 ];
 
 export default function HomePage() {
+  const [copiedPip, setCopiedPip] = useState(false);
+
+  function handleCopyPip() {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText('pip install agreekit');
+        setCopiedPip(true);
+        setTimeout(() => setCopiedPip(false), 2000);
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-10 sm:gap-14 py-2 sm:py-4">
-      {/* Hero Section */}
-      <section className="space-y-4 max-w-4xl">
-        <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-xs font-semibold text-series-1 shadow-2xs">
-          <Sparkles size={13} aria-hidden />
+    <div className="flex flex-col gap-12 sm:gap-16 py-3 sm:py-6">
+      {/* Hero Section — Inspired by Vercel & Nextra minimalism */}
+      <section className="space-y-6 max-w-4xl">
+        <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/80 px-3.5 py-1 text-xs font-semibold text-series-1 shadow-2xs backdrop-blur-sm transition-all hover:border-series-1/30">
+          <Sparkles size={13} className="text-series-1 shrink-0" aria-hidden />
           <span>OPEN-SOURCE VALIDATION</span>
+          <span className="text-ink-muted">•</span>
+          <span className="text-ink-secondary font-medium">Wearable Health Algorithms</span>
         </div>
 
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-5xl leading-tight">
-          Measure Ground Truth. Validate With Confidence.
-        </h1>
+        <div className="space-y-4">
+          <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl lg:text-5xl leading-tight">
+            Measure Ground Truth. Validate With Confidence.
+          </h1>
 
-        <p className="text-base sm:text-lg leading-relaxed text-ink-secondary max-w-3xl">
-          The open-source suite for wearable sensors and health algorithms.
-        </p>
+          <p className="text-base sm:text-lg leading-relaxed text-ink-secondary max-w-3xl">
+            The open-source suite for wearable sensors and health algorithms.
+          </p>
+        </div>
+
+        {/* Quick Launch & Developer Actions */}
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <Link
+            to="/academy"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-xs sm:text-sm font-semibold text-surface shadow-xs transition-all hover:opacity-90 active:scale-[0.98]"
+          >
+            <span>Explore The Academy</span>
+            <ArrowRight size={15} aria-hidden />
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleCopyPip}
+            title="Copy install command"
+            className="group inline-flex items-center gap-2.5 rounded-xl border border-hairline bg-surface px-3.5 py-2.5 font-mono text-xs text-ink-secondary shadow-2xs transition-all hover:border-ink/25 hover:bg-plane active:scale-[0.98]"
+          >
+            <Terminal size={13} className="text-series-7 shrink-0" aria-hidden />
+            <span className="text-ink font-semibold">$ pip install agreekit</span>
+            {copiedPip ? (
+              <Check size={13} className="text-good" aria-label="Copied" />
+            ) : (
+              <Copy size={13} className="text-ink-muted group-hover:text-ink transition-colors" aria-hidden />
+            )}
+          </button>
+
+          <a
+            href="https://github.com/ross-wilkinson/open-wearable-validation"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane px-3.5 py-2.5 text-xs font-semibold text-ink-secondary shadow-2xs hover:text-ink hover:border-ink/20 hover:bg-surface transition-all"
+          >
+            <span>GitHub</span>
+            <ExternalLink size={12} aria-hidden />
+          </a>
+        </div>
+
+        {/* High-craft Trust Indicators — Inspired by Family.co */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 text-xs text-ink-muted border-t border-hairline/60">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-series-3 shrink-0" aria-hidden />
+            <span>Zero Data Upload</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Cpu size={14} className="text-series-1 shrink-0" aria-hidden />
+            <span>100% In-Browser Math</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Layers size={14} className="text-series-4 shrink-0" aria-hidden />
+            <span>4 Architectural Pillars</span>
+          </span>
+        </div>
       </section>
 
-      {/* The 4 Main Pillars Showcase */}
+      {/* The 4 Main Pillars Showcase — Bento Architecture */}
       <section aria-label="Open Wearable Validation Platform Pillars" className="space-y-8 sm:space-y-10">
         {/* Pillar 1: The Validation Academy */}
         <div className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 space-y-6 shadow-2xs">
@@ -1064,8 +1144,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Minimalist Provenance Strip */}
-      <section className="rounded-2xl border border-hairline bg-surface p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Minimalist Provenance Strip — Nextra/Vercel Trust Banner */}
+      <section className="rounded-2xl border border-hairline bg-surface p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <OpenWearableValidationLogo size={20} />
