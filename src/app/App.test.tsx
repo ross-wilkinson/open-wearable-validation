@@ -2,29 +2,37 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.tsx';
-import { MODULE_ROUTES } from './navigation.ts';
 
 describe('App shell', () => {
   it('renders the home page at the default route', () => {
     render(<App />);
     expect(
       screen.getByRole('heading', {
-        name: /everything you need to design, size, and analyze human-subject validation studies/i,
+        name: /measure ground truth\. validate with confidence\./i,
       }),
     ).toBeInTheDocument();
   });
 
-  it('lists every module on the home page', () => {
+  it('renders all portal tiles on the home page', () => {
     render(<App />);
-    for (const route of MODULE_ROUTES) {
-      expect(screen.getByRole('heading', { name: route.title })).toBeInTheDocument();
+    const tileHeadings = [
+      'Design your validation study',
+      'Evaluate product launch readiness',
+      'Avoid costly statistical pitfalls',
+      'Learn wearable validation hands-on',
+      'Execute agreement analyses in Python',
+      'Ground your protocol in population data',
+      'Evaluate clinical reference standards',
+    ];
+    for (const title of tileHeadings) {
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     }
   });
 
-  it('displays links to Health Data Distributions and agreekit', () => {
+  it('displays links to Health Data Catalog and agreekit', () => {
     render(<App />);
     expect(
-      screen.getAllByRole('link', { name: /health data distributions/i }).length,
+      screen.getAllByRole('link', { name: /health data (catalog|distributions)/i }).length,
     ).toBeGreaterThan(0);
     expect(
       screen.getAllByRole('link', { name: /agreekit/i }).length,
@@ -32,7 +40,7 @@ describe('App shell', () => {
   });
 
   it('shows a not-found page for an unknown route', () => {
-    window.location.hash = '#/does-not-exist';
+    window.history.pushState({}, '', '/does-not-exist');
     render(<App />);
     expect(
       screen.getByRole('heading', { name: /page not found/i }),

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PAIRED_ALGORITHM_PRESETS,
+  correlationSweep,
   loaPrecision,
   loaPrecisionApproximate,
+  sampleSizeForAttrition,
   sampleSizeForEquivalence,
   sampleSizeForThreshold,
+  sampleSizePairedNonInferiority,
 } from './agreementModel.ts';
 import {
   checkGrid,
@@ -176,3 +180,155 @@ describe('sampleSizeForEquivalence', () => {
     expect(sampleSizeForEquivalence({ ...base, sigma: 2 })!).toBeGreaterThan(n);
   });
 });
+
+describe('sampleSizePairedNonInferiority', () => {
+  it('reproduces Benchmark Case 2: drops N from 191 (uncorrelated) to 12 at rho=0.94', () => {
+    // Benchmark Case 2: margin = 1.5, sigma = 5.0, alpha = 0.05, power = 0.90
+    const uncoupled = sampleSizePairedNonInferiority({
+      margin: 1.5,
+      delta: 0.0,
+      sigma: 5.0,
+      rho: 0.0,
+      alpha: 0.05,
+      power: 0.90,
+    });
+    expect(uncoupled).toBe(191);
+
+    const paired = sampleSizePairedNonInferiority({
+      margin: 1.5,
+      delta: 0.0,
+      sigma: 5.0,
+      rho: 0.94,
+      alpha: 0.05,
+      power: 0.90,
+    });
+    expect(paired).toBe(12);
+
+    const extreme = sampleSizePairedNonInferiority({
+      margin: 1.5,
+      delta: 0.0,
+      sigma: 5.0,
+      rho: 0.95,
+      alpha: 0.05,
+      power: 0.90,
+    });
+    expect(extreme).toBe(10);
+  });
+
+  it('supports direct sigmaPair input', () => {
+    // var_pair = 2.5 -> sigmaPair = sqrt(2.5)
+    const n = sampleSizePairedNonInferiority({
+      margin: 1.5,
+      delta: 0.0,
+      sigmaPair: Math.sqrt(2.5),
+      alpha: 0.05,
+      power: 0.90,
+    });
+    expect(n).toBe(10);
+  });
+
+  it('handles higherIsBetter metrics (e.g. Kappa parity)', () => {
+    const n = sampleSizePairedNonInferiority({
+      margin: 0.05,
+      delta: 0.0,
+      sigmaPair: 0.15,
+      alpha: 0.025,
+      power: 0.80,
+      higherIsBetter: true,
+    });
+    expect(n).toBe(71);
+  });
+
+  it('returns null for invalid inputs or non-achievable non-inferiority', () => {
+    expect(
+      sampleSizePairedNonInferiority({
+        margin: 1.0,
+        delta: 1.2, // Expected degradation exceeds margin
+        sigma: 2.0,
+        rho: 0.9,
+      }),
+    ).toBeNull();
+
+    expect(
+      sampleSizePairedNonInferiority({
+        margin: -1.0,
+        sigma: 2.0,
+      }),
+    ).toBeNull();
+
+    expect(
+      sampleSizePairedNonInferiority({
+        margin: 1.0,
+        sigma: -2.0,
+      }),
+    ).toBeNull();
+  });
+
+  it('computes correlationSweep monotonically decreasing with rho', () => {
+    const points = correlationSweep({
+      margin: 1.5,
+      delta: 0.0,
+      sigma: 5.0,
+      alpha: 0.05,
+      power: 0.90,
+    });
+    expect(points.length).toBeGreaterThan(10);
+    expect(points[0]!.rho).toBe(0.0);
+    expect(points[0]!.n).toBe(191);
+
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i]!.n!).toBeLessThanOrEqual(points[i - 1]!.n!);
+    }
+  });
+
+  it('defines valid PAIRED_ALGORITHM_PRESETS', () => {
+    expect(PAIRED_ALGORITHM_PRESETS.length).toBeGreaterThanOrEqual(3);
+    for (const preset of PAIRED_ALGORITHM_PRESETS) {
+      const computed = sampleSizePairedNonInferiority({
+        margin: preset.margin,
+        delta: preset.delta,
+        sigma: preset.sigma,
+        rho: preset.rho,
+        sigmaPair: preset.sigmaPair,
+        alpha: preset.alpha,
+        power: preset.power,
+        higherIsBetter: preset.higherIsBetter,
+      });
+      expect(computed).toBe(preset.pairedN);
+
+      if (preset.sigma !== undefined) {
+        const computedUncorrelated = sampleSizePairedNonInferiority({
+          margin: preset.margin,
+          delta: preset.delta,
+          sigma: preset.sigma,
+          rho: 0.0,
+          alpha: preset.alpha,
+          power: preset.power,
+          higherIsBetter: preset.higherIsBetter,
+        });
+        expect(computedUncorrelated).toBe(preset.uncorrelatedN);
+      }
+    }
+  });
+});
+
+describe('sampleSizeForAttrition', () => {
+  it('calculates single dropout rate attrition correctly', () => {
+    // 100 analyzable at 30% dropout -> 100 / 0.70 = 142.85 -> 143
+    expect(sampleSizeForAttrition(100, 0.30)).toBe(143);
+  });
+
+  it('calculates compound attrition rates correctly', () => {
+    // 15% TST < 3h, 10% SQ < 85%, 5% alignment failure
+    // Retention = 0.85 * 0.90 * 0.95 = 0.72675
+    // 100 / 0.72675 = 137.59 -> 138
+    expect(sampleSizeForAttrition(100, [0.15, 0.10, 0.05])).toBe(138);
+  });
+
+  it('guards against invalid rates or non-positive analyzable count', () => {
+    expect(sampleSizeForAttrition(0, 0.2)).toBeNull();
+    expect(sampleSizeForAttrition(100, 1.0)).toBeNull();
+    expect(sampleSizeForAttrition(100, -0.1)).toBeNull();
+  });
+});
+

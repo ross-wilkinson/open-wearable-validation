@@ -128,4 +128,12 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     minPercent: 15,
     note: 'Banding follows the 10-point Monk Skin Tone Scale. Optical sensors perform differently across skin tones, so this is the segmentation most likely to be under-powered by accident.',
   },
+  {
+    id: 'fda-skin-tone',
+    factor: 'FDA 510(k) Skin Tone (ISO 80601-2-61)',
+    segmentLabels: ['Fitzpatrick I–II (MST 01–04)', 'Fitzpatrick III–IV (MST 05–07)', 'Fitzpatrick V–VI (MST 08–10, Min 15%)'],
+    sampleSize: 65,
+    minPercent: 15,
+    note: 'FDA 510(k) pre-market guidance under ISO 80601-2-61 Table 1 requires at least 15% representation in dark pigmentation categories (Fitzpatrick V–VI, corresponding to Monk MST 08–10), with strict ceiling caps on lighter segments to prevent walk-in recruitment bias.',
+  },
 ];

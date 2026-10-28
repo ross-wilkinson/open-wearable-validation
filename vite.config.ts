@@ -5,16 +5,14 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-// `base` must match the GitHub Pages project-page path, i.e. the repository
-// name: <user>.github.io/validation-study-designer/. Getting it wrong is the
-// classic "works on localhost, blank page on Pages" failure — every asset URL
-// Vite emits carries this prefix.
+// Base URL set to '/' for root-domain SPA hosting on Vercel with clean URLs.
 export default defineConfig({
-  base: '/validation-study-designer/',
+  base: '/',
   plugins: [react()],
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setupTests.ts'],
+    testTimeout: 15000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

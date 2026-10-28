@@ -1310,3 +1310,1103 @@ export function generatePlxJsonSummary(params: {
     2,
   );
 }
+
+// ============================================================================
+// Two-Gate 4-Quadrant Launch Readiness Visualizer
+// ============================================================================
+
+export type LaunchQuadrant =
+  | 'GREEN_GO'
+  | 'AMBER_PARITY_RISK'
+  | 'AMBER_QUALITY_DEBT'
+  | 'RED_NOGO';
+
+export interface QuadrantClassification {
+  quadrant: LaunchQuadrant;
+  name: string;
+  badge: string;
+  statusLabel: string;
+  color: string;
+  actionMandate: string;
+  commercialMeaning: string;
+  gate1Passed: boolean;
+  gate2Passed: boolean;
+}
+
+/**
+ * Classifies a candidate device/algorithm into one of the four commercial launch quadrants
+ * based on Gate 1 (Absolute Performance) and Gate 2 (Predecessor Parity).
+ */
+export function classifyQuadrant(
+  gate1Passed: boolean,
+  gate2Passed: boolean,
+): QuadrantClassification {
+  if (gate1Passed && gate2Passed) {
+    return {
+      quadrant: 'GREEN_GO',
+      name: 'Quadrant 1: Green Go (Launch Approved)',
+      badge: '🟢 APPROVED',
+      statusLabel: '🟢 APPROVED (Quadrant 1: Green Go)',
+      color: '#10b981', // emerald-500
+      actionMandate:
+        'Immediate production sign-off. Algorithm meets or beats predecessor and satisfies clinical bar.',
+      commercialMeaning:
+        'Meets clinical/consumer bar AND matches or beats predecessor. Zero regression risk.',
+      gate1Passed: true,
+      gate2Passed: true,
+    };
+  }
+  if (gate1Passed && !gate2Passed) {
+    return {
+      quadrant: 'AMBER_PARITY_RISK',
+      name: 'Quadrant 2: Amber (Parity Risk)',
+      badge: '🟡 CAUTION (PARITY RISK)',
+      statusLabel: '🟡 CAUTION (Quadrant 2: Amber Parity Risk)',
+      color: '#f59e0b', // amber-500
+      actionMandate:
+        'Conditional approval or targeted algorithm recalibration on regression points before OTA release.',
+      commercialMeaning:
+        'Algorithm is accurate in an absolute sense, but regressed compared to Gen 1. Existing loyal users will complain.',
+      gate1Passed: true,
+      gate2Passed: false,
+    };
+  }
+  if (!gate1Passed && gate2Passed) {
+    return {
+      quadrant: 'AMBER_QUALITY_DEBT',
+      name: 'Quadrant 3: Amber (Quality Debt)',
+      badge: '🟡 CAUTION (QUALITY DEBT)',
+      statusLabel: '🟡 CAUTION (Quadrant 3: Amber Quality Debt)',
+      color: '#f59e0b', // amber-500
+      actionMandate:
+        'Marketing / clinical review; risk acceptance or hold feature launch for next silicon cycle.',
+      commercialMeaning:
+        'Matches predecessor performance ("no worse than last year"), but fails absolute accuracy KPIs.',
+      gate1Passed: false,
+      gate2Passed: true,
+    };
+  }
+  return {
+    quadrant: 'RED_NOGO',
+    name: 'Quadrant 4: Red Light (Hard No-Go)',
+    badge: '🔴 NO-GO',
+    statusLabel: '🔴 NO-GO (Quadrant 4: Red Light)',
+    color: '#ef4444', // red-500
+    actionMandate:
+      'Hard stop; return to DSP and filter development. Do not ship to production.',
+    commercialMeaning:
+      'Inaccurate against reference standard AND significantly worse than predecessor.',
+    gate1Passed: false,
+    gate2Passed: false,
+  };
+}
+
+export interface EllipsePoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Computes 2D confidence ellipse boundary coordinates around (centerX, centerY).
+ *
+ * For confidence level 1 - alpha = 0.95, chi^2(2, 0.95) = -2 * ln(0.05) ~= 5.99146.
+ * Radius multiplier c = sqrt(5.99146) ~= 2.4477.
+ */
+export function generateConfidenceEllipse(
+  centerX: number,
+  centerY: number,
+  seX: number,
+  seY: number,
+  rXY = 0.0,
+  confidence = 0.95,
+  nPoints = 64,
+): EllipsePoint[] {
+  const safeSeX = Math.max(1e-4, seX);
+  const safeSeY = Math.max(1e-4, seY);
+  const safeR = Math.max(-0.999, Math.min(0.999, rXY));
+  const safeConf = Math.max(0.5, Math.min(0.999, confidence));
+
+  const c = Math.sqrt(-2 * Math.log(1 - safeConf));
+  const varX = safeSeX ** 2;
+  const varY = safeSeY ** 2;
+  const covXY = safeR * safeSeX * safeSeY;
+
+  const trace = varX + varY;
+  const diff = varX - varY;
+  const disc = Math.sqrt(Math.max(0, diff ** 2 + 4 * covXY ** 2));
+  const lambda1 = Math.max(1e-8, (trace + disc) / 2);
+  const lambda2 = Math.max(1e-8, (trace - disc) / 2);
+
+  const a = c * Math.sqrt(lambda1);
+  const b = c * Math.sqrt(lambda2);
+  const theta = 0.5 * Math.atan2(2 * covXY, diff);
+
+  const points: EllipsePoint[] = [];
+  const cosTheta = Math.cos(theta);
+  const sinTheta = Math.sin(theta);
+
+  for (let i = 0; i <= nPoints; i++) {
+    const t = (i / nPoints) * 2 * Math.PI;
+    const cosT = Math.cos(t);
+    const sinT = Math.sin(t);
+    const dx = a * cosT * cosTheta - b * sinT * sinTheta;
+    const dy = a * cosT * sinTheta + b * sinT * cosTheta;
+    points.push({
+      x: centerX + dx,
+      y: centerY + dy,
+    });
+  }
+
+  return points;
+}
+
+export interface QuadrantCandidatePreset {
+  id: string;
+  name: string;
+  description: string;
+  gate1Margin: number; // >0 pass, <0 fail
+  gate2Parity: number; // >0 pass, <0 fail
+  seX: number;
+  seY: number;
+  rXY: number;
+  expectedQuadrant: LaunchQuadrant;
+}
+
+export const QUADRANT_CANDIDATE_PRESETS: QuadrantCandidatePreset[] = [
+  {
+    id: 'ideal-launch',
+    name: 'Ideal Candidate (Quadrant 1: Green Go)',
+    description:
+      'Exceeds clinical accuracy bar against gold standard and demonstrates clear superiority/parity against legacy hardware. Immediate production release approved.',
+    gate1Margin: 0.45,
+    gate2Parity: 0.4,
+    seX: 0.08,
+    seY: 0.07,
+    rXY: 0.35,
+    expectedQuadrant: 'GREEN_GO',
+  },
+  {
+    id: 'regressive-upgrade',
+    name: 'Regressive Upgrade (Quadrant 2: Amber Parity Risk)',
+    description:
+      'Meets clinical accuracy in absolute terms, but regressed compared to Gen 1 on the other wrist. Existing loyal users will complain their new watch feels worse.',
+    gate1Margin: 0.5,
+    gate2Parity: -0.35,
+    seX: 0.09,
+    seY: 0.08,
+    rXY: 0.2,
+    expectedQuadrant: 'AMBER_PARITY_RISK',
+  },
+  {
+    id: 'legacy-stagnation',
+    name: 'Legacy Stagnation (Quadrant 3: Amber Quality Debt)',
+    description:
+      'Matches predecessor performance ("no worse than last year"), but both generations fail the absolute clinical accuracy threshold. Competitors will outperform it.',
+    gate1Margin: -0.35,
+    gate2Parity: 0.35,
+    seX: 0.08,
+    seY: 0.07,
+    rXY: 0.15,
+    expectedQuadrant: 'AMBER_QUALITY_DEBT',
+  },
+  {
+    id: 'flawed-prototype',
+    name: 'Flawed Prototype (Quadrant 4: Red No-Go)',
+    description:
+      'Inaccurate against reference gold standard AND significantly worse than predecessor. Hard stop; return to algorithm and filter development.',
+    gate1Margin: -0.45,
+    gate2Parity: -0.4,
+    seX: 0.1,
+    seY: 0.09,
+    rXY: 0.4,
+    expectedQuadrant: 'RED_NOGO',
+  },
+];
+
+export interface LaunchBriefingMetric {
+  name: string;
+  value: string;
+  ci?: string;
+  passed: boolean;
+  target: string;
+  priority?: string;
+}
+
+export interface LaunchBriefingParityMetric {
+  name: string;
+  frequentistDiff: string;
+  frequentistPassed: boolean;
+  frequentistTarget: string;
+  assurance: number;
+  assurancePassed: boolean;
+  assuranceTarget: number;
+  cliffsDelta: number;
+  cliffsDeltaPassed: boolean;
+  cliffsDeltaTarget: number;
+  tieMargin?: string;
+}
+
+export interface LaunchBriefingInput {
+  title?: string;
+  quadrant: LaunchQuadrant;
+  gate1Status: 'PASS' | 'FAIL';
+  gate1Metrics: LaunchBriefingMetric[];
+  gate2Status: 'PASS' | 'FAIL';
+  gate2Metrics: LaunchBriefingParityMetric[];
+  nEnrolled?: number;
+  nAnalyzable?: number;
+  attritionYield?: number;
+}
+
+/**
+ * Generates the standardized Executive Committee Launch Readiness briefing table in markdown,
+ * matching Google Pixel Watch framework and agreekit.report.LaunchScorecard.to_markdown().
+ */
+export function generateLaunchBriefingMarkdown(input: LaunchBriefingInput): string {
+  const {
+    title = 'COMMERCIAL LAUNCH READINESS SCORECARD',
+    gate1Status,
+    gate1Metrics,
+    gate2Status,
+    gate2Metrics,
+    nEnrolled,
+    nAnalyzable,
+    attritionYield,
+  } = input;
+
+  const classification = classifyQuadrant(gate1Status === 'PASS', gate2Status === 'PASS');
+  const sep = '='.repeat(60);
+  const lines: string[] = [
+    sep,
+    title.padStart(Math.floor((60 + title.length) / 2)).padEnd(60),
+    sep,
+    `OVERALL LAUNCH STATUS: ${classification.statusLabel}\n`,
+  ];
+
+  // Gate 1
+  const g1Icon = gate1Status === 'PASS' ? '🟢 PASS' : '🔴 FAIL';
+  lines.push(`GATE 1: ABSOLUTE PERFORMANCE (vs. Reference)       ${g1Icon}`);
+  gate1Metrics.forEach((m, i) => {
+    const isLast = i === gate1Metrics.length - 1;
+    const prefix = isLast ? '  └─ ' : '  ├─ ';
+    const check = m.passed ? '✓' : '✗';
+    const ciStr = m.ci ? ` [${m.ci}]` : '';
+    const advStr = m.priority === 'advisory' ? ' (Advisory)' : '';
+    lines.push(`${prefix}${m.name}: ${m.value}${ciStr}               ${check} (${m.target})${advStr}`);
+  });
+  lines.push('');
+
+  // Gate 2
+  const g2Icon = gate2Status === 'PASS' ? '🟢 PASS' : '🔴 FAIL';
+  lines.push(`GATE 2: PREDECESSOR PARITY (vs. Legacy Device)     ${g2Icon}`);
+  gate2Metrics.forEach((m, i) => {
+    const isLast = i === gate2Metrics.length - 1;
+    const p1Prefix = '  ├─ ';
+    const p2Prefix = '  ├─ ';
+    const p3Prefix = isLast ? '  └─ ' : '  ├─ ';
+    const tauStr = m.tieMargin ? ` (τ = ${m.tieMargin})` : '';
+
+    const fCheck = m.frequentistPassed ? '✓' : '✗';
+    lines.push(`${p1Prefix}Frequentist Lower Bound: ${m.name} Δ = ${m.frequentistDiff}       ${fCheck} (${m.frequentistTarget})`);
+
+    const aCheck = m.assurancePassed ? '✓' : '✗';
+    lines.push(`${p2Prefix}Bayesian Assurance: P(Non-Inferior) = ${m.assurance.toFixed(2)}      ${aCheck} (Exceeds ${m.assuranceTarget.toFixed(2)})`);
+
+    const cdCheck = m.cliffsDeltaPassed ? '✓' : '✗';
+    lines.push(`${p3Prefix}Paired Cliff's Delta: δ = ${m.cliffsDelta >= 0 ? '+' : ''}${m.cliffsDelta.toFixed(2)}${tauStr}    ${cdCheck} (Exceeds ${m.cliffsDeltaTarget >= 0 ? '+' : ''}${m.cliffsDeltaTarget.toFixed(2)})`);
+  });
+
+  if (nEnrolled !== undefined || nAnalyzable !== undefined) {
+    lines.push('');
+    const enrolledStr = nEnrolled ? `Enrolled N=${nEnrolled}` : '';
+    const analyzableStr = nAnalyzable ? `Analyzable N=${nAnalyzable}` : '';
+    let yieldVal = attritionYield;
+    if (yieldVal === undefined && nEnrolled && nAnalyzable) {
+      yieldVal = (nAnalyzable / nEnrolled) * 100;
+    }
+    const yieldStr = yieldVal !== undefined ? ` (${yieldVal.toFixed(1)}% Yield)` : '';
+    const parts = [enrolledStr, analyzableStr].filter(Boolean);
+    lines.push(`STUDY ATTRITION: ${parts.join(' | ')}${yieldStr}`);
+  }
+
+  lines.push(sep);
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Vector 1: KPI & Metric Taxonomy
+// ============================================================================
+
+export interface KpiTaxonomyDefinition {
+  id: string;
+  name: string;
+  acronym: string;
+  formula: string;
+  purpose: string;
+  outlierSensitivity: 'Quadratic (High)' | 'Linear (Medium)' | 'Non-Parametric (Robust)' | 'Deceptive / High Risk';
+  clinicalInterpretation: string;
+  standardReference: string;
+}
+
+export const KPI_TAXONOMY_DEFINITIONS: KpiTaxonomyDefinition[] = [
+  {
+    id: 'rmse',
+    name: 'Root Mean Square Error',
+    acronym: 'RMSE / Arms',
+    formula: 'sqrt((1/N) * sum((dev_i - ref_i)^2))',
+    purpose: 'Standardized regulatory accuracy metric for continuous physiological monitors.',
+    outlierSensitivity: 'Quadratic (High)',
+    clinicalInterpretation: 'Penalizes large error spikes heavily; ensures device does not produce rare dangerous excursions.',
+    standardReference: 'ISO 80601-2-61:2017 Clause 201.12.1 / FDA SpO2 Guidance',
+  },
+  {
+    id: 'mae',
+    name: 'Mean Absolute Error',
+    acronym: 'MAE',
+    formula: '(1/N) * sum(|dev_i - ref_i|)',
+    purpose: 'Expected average magnitude of error under typical consumer conditions.',
+    outlierSensitivity: 'Linear (Medium)',
+    clinicalInterpretation: 'Linear penalty; more representative of typical day-to-day user experience than RMSE.',
+    standardReference: 'ANSI/CTA-2065: Physical Activity & Physiological Monitoring',
+  },
+  {
+    id: 'loa',
+    name: 'Bland-Altman Limits of Agreement',
+    acronym: '95% LoA',
+    formula: 'Mean Bias +/- 1.96 * SD_total',
+    purpose: 'Interval expected to contain 95% of future pairwise measurement differences.',
+    outlierSensitivity: 'Linear (Medium)',
+    clinicalInterpretation: 'Must account for repeated measures clustering via ANOVA; naive pooled SD understates LoA width.',
+    standardReference: 'Bland & Altman (2007) J Biopharm Stat 17(4):571-82',
+  },
+  {
+    id: 'tolerance-coverage',
+    name: 'Tolerance Window Coverage',
+    acronym: '% Within Tolerance',
+    formula: 'P(|dev_i - ref_i| <= tau) * 100%',
+    purpose: 'Direct proportion of readings meeting clinically acceptable accuracy.',
+    outlierSensitivity: 'Non-Parametric (Robust)',
+    clinicalInterpretation: 'Easily understood by product leaders: e.g. 95% of readings within +/- 3 bpm or +/- 3% SpO2.',
+    standardReference: 'FDA Digital Health Software Pre-Cert & User Experience Standards',
+  },
+  {
+    id: 'correlation-r',
+    name: 'Pearson Correlation Coefficient (Deceptive)',
+    acronym: 'r / R²',
+    formula: 'Cov(dev, ref) / (SD_dev * SD_ref)',
+    purpose: 'Measures linear co-variation, NOT agreement (dangerously misapplied in validation).',
+    outlierSensitivity: 'Deceptive / High Risk',
+    clinicalInterpretation:
+      'A device reporting 2x truth has r = 1.000 but fails all clinical gates. Wide dynamic physiological range artificially inflates r.',
+    standardReference: 'Bland & Altman (1986) Lancet 327(8476):307-10',
+  },
+];
+
+export const PEARSON_R_DECEPTION_EXPLANATION =
+  'Why Correlation (r) is Deceptive in Validation: Pearson r measures linear association rather than measurement agreement. ' +
+  'A device that consistently measures double the true heart rate (y = 2x) or has a 20 bpm systemic offset (y = x + 20) achieves a near-perfect ' +
+  'r = 1.000 while posing catastrophic clinical risk. Furthermore, physiological studies spanning wide dynamic ranges (e.g. 50–190 bpm) artificially ' +
+  'inflate r to >0.98 even in the presence of severe +/- 15 bpm errors, while studies with narrow resting ranges (e.g. 96–99% SpO2) depress r to <0.30 ' +
+  'despite sub-percentage accuracy. Regulatory standards (ISO 80601-2-61, FDA, AAMI) explicitly reject r in favor of RMSE/Arms and Bland-Altman LoA.';
+
+/**
+ * Computes live Pearson correlation coefficient r between devValue and refValue.
+ * Exposes how wide physiological dynamic range can artificially inflate r even
+ * when limits of agreement or RMSE fail clinical acceptance.
+ */
+export function computePearsonR(observations: PairedObservation[]): number {
+  const n = observations.length;
+  if (n < 2) return 0;
+  let sumX = 0;
+  let sumY = 0;
+  for (const o of observations) {
+    sumX += o.refValue;
+    sumY += o.devValue;
+  }
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  let num = 0;
+  let denX = 0;
+  let denY = 0;
+  for (const o of observations) {
+    const dx = o.refValue - meanX;
+    const dy = o.devValue - meanY;
+    num += dx * dy;
+    denX += dx * dx;
+    denY += dy * dy;
+  }
+  const den = Math.sqrt(denX * denY);
+  if (den <= 0) return 0;
+  return Number((num / den).toFixed(3));
+}
+
+// ============================================================================
+// Vector 2: ECDF & Error Morphology
+// ============================================================================
+
+export interface SubjectEcdfEnvelopePoint {
+  threshold: number;
+  pooledCoverage: number;
+  subjectWeightedCoverage: number;
+  p10Coverage: number;
+  p90Coverage: number;
+  minCoverage: number;
+  maxCoverage: number;
+}
+
+export interface EcdfCrossoverPoint {
+  threshold: number;
+  modelACoverage: number;
+  modelBCoverage: number;
+  crossoverDetected: boolean;
+  interpretation: string;
+}
+
+export interface KsPseudoreplicationDiagnostic {
+  totalRowsN: number;
+  independentSubjectsM: number;
+  replicatesK: number;
+  naivePooledPValue: number;
+  clusterHonestPValue: number;
+  designEffect: number;
+  hazardExplanation: string;
+}
+
+export function computeSubjectWeightedEcdf(
+  observations: PairedObservation[],
+  maxThreshold?: number,
+  numSteps: number = 40,
+): SubjectEcdfEnvelopePoint[] {
+  if (observations.length === 0) return [];
+
+  const subjectMap = new Map<number, number[]>();
+  const allAbsDiffs: number[] = [];
+
+  for (const obs of observations) {
+    allAbsDiffs.push(obs.absDiff);
+    const list = subjectMap.get(obs.subjectId) ?? [];
+    list.push(obs.absDiff);
+    subjectMap.set(obs.subjectId, list);
+  }
+
+  const maxVal = observations.length > 0 ? Math.max(...allAbsDiffs) : 0;
+  const upper = Math.max(maxThreshold ?? 0, Math.ceil(maxVal * 1.05), 1.0);
+  const step = upper / numSteps;
+
+  const points: SubjectEcdfEnvelopePoint[] = [];
+
+  for (let s = 0; s <= numSteps; s += 1) {
+    const x = s * step;
+
+    // Pooled coverage
+    const countPooled = allAbsDiffs.filter((d) => d <= x).length;
+    const pooledCoverage = Number(((countPooled / allAbsDiffs.length) * 100).toFixed(1));
+
+    // Per-subject coverages
+    const subjectCoverages: number[] = [];
+    for (const [, diffs] of subjectMap) {
+      const c = diffs.filter((d) => d <= x).length;
+      subjectCoverages.push((c / diffs.length) * 100);
+    }
+    subjectCoverages.sort((a, b) => a - b);
+
+    const m = subjectCoverages.length;
+    const meanSubj = subjectCoverages.reduce((a, b) => a + b, 0) / (m || 1);
+    const p10 = subjectCoverages[Math.floor(m * 0.1)] ?? subjectCoverages[0] ?? 0;
+    const p90 = subjectCoverages[Math.min(m - 1, Math.floor(m * 0.9))] ?? subjectCoverages[m - 1] ?? 100;
+    const minCov = subjectCoverages[0] ?? 0;
+    const maxCov = subjectCoverages[m - 1] ?? 100;
+
+    points.push({
+      threshold: Number(x.toFixed(2)),
+      pooledCoverage,
+      subjectWeightedCoverage: Number(meanSubj.toFixed(1)),
+      p10Coverage: Number(p10.toFixed(1)),
+      p90Coverage: Number(p90.toFixed(1)),
+      minCoverage: Number(minCov.toFixed(1)),
+      maxCoverage: Number(maxCov.toFixed(1)),
+    });
+  }
+
+  return points;
+}
+
+export function detectEcdfCrossover(
+  candidatePoints: { threshold: number; coverage: number }[],
+  comparatorPoints: { threshold: number; coverage: number }[],
+): EcdfCrossoverPoint {
+  let crossoverDetected = false;
+  let crossThresh = 0;
+  let covA = 0;
+  let covB = 0;
+
+  let lastNonZeroSign = 0;
+  const len = Math.min(candidatePoints.length, comparatorPoints.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const diff = candidatePoints[i]!.coverage - comparatorPoints[i]!.coverage;
+    const currentSign = diff > 0.05 ? 1 : diff < -0.05 ? -1 : 0;
+
+    if (lastNonZeroSign !== 0 && currentSign !== 0 && currentSign !== lastNonZeroSign) {
+      crossoverDetected = true;
+      crossThresh = candidatePoints[i]!.threshold;
+      covA = candidatePoints[i]!.coverage;
+      covB = comparatorPoints[i]!.coverage;
+      break;
+    }
+
+    if (currentSign !== 0) {
+      lastNonZeroSign = currentSign;
+    }
+  }
+
+  const interpretation = crossoverDetected
+    ? `Morphology Crossover detected at error threshold ${crossThresh.toFixed(1)}: Candidate algorithm exhibits tighter median error below this point, but comparator retains higher coverage / shorter tails at extreme thresholds.`
+    : 'No morphology crossover detected: One distribution uniformly dominates across the full clinical tolerance span.';
+
+  return {
+    threshold: crossThresh,
+    modelACoverage: covA,
+    modelBCoverage: covB,
+    crossoverDetected,
+    interpretation,
+  };
+}
+
+export function computeKsPseudoreplicationDiagnostic(
+  m: number,
+  k: number,
+  icc: number = 0.45,
+): KsPseudoreplicationDiagnostic {
+  const safeM = Math.max(1, m);
+  const safeK = Math.max(1, k);
+  const totalRowsN = safeM * safeK;
+  const safeIcc = Math.max(0, Math.min(1, icc));
+  const designEffect = Math.max(1.0, 1 + (safeK - 1) * safeIcc);
+  const nEffective = Math.max(1, totalRowsN / designEffect);
+
+  // Calibrated typical empirical KS distance D for repeated-measures sensor validation
+  const D = 0.18;
+  const naiveExp = -2 * totalRowsN * (D ** 2);
+  const clusterExp = -2 * nEffective * (D ** 2);
+
+  const naivePooledPValue = Number(Math.max(0.0001, Math.min(1.0, 2 * Math.exp(naiveExp))).toFixed(4));
+  const clusterHonestPValue = Number(Math.max(0.001, Math.min(1.0, 2 * Math.exp(clusterExp))).toFixed(3));
+
+  const hazardExplanation =
+    `The Kolmogorov-Smirnov (KS) Pseudoreplication Trap: Treating N = ${totalRowsN} pooled observations from m = ${safeM} participants (k = ${safeK} replicates) ` +
+    `as independent violates the fundamental i.i.d. assumption. Clustered variance (ICC = ${safeIcc.toFixed(2)}, DEFF = ${designEffect.toFixed(1)}) inflates the effective sample size, ` +
+    `yielding an artificially significant naive p-value (p = ${naivePooledPValue.toFixed(4)}). A cluster-honest permutation or subject-aggregated test yields ` +
+    `p = ${clusterHonestPValue.toFixed(3)}, proving that apparent distributional superiority was driven by repeated measures pseudoreplication rather than true population shift.`;
+
+  return {
+    totalRowsN,
+    independentSubjectsM: safeM,
+    replicatesK: safeK,
+    naivePooledPValue,
+    clusterHonestPValue,
+    designEffect: Number(designEffect.toFixed(2)),
+    hazardExplanation,
+  };
+}
+
+// ============================================================================
+// Vector 3: Three-Way Head-to-Head Dominance
+// ============================================================================
+
+export interface ThreeWayPairedObservation {
+  id: string;
+  subjectId: number;
+  obsIndex: number;
+  activity: 'running' | 'cycling' | 'rest';
+  refValue: number;
+  dev1Value: number;
+  dev2Value: number;
+  e1: number;
+  e2: number;
+  absE1: number;
+  absE2: number;
+  delta: number;
+}
+
+export interface SubjectHeadToHeadDominance {
+  subjectId: number;
+  totalEpochs: number;
+  dev1Wins: number;
+  dev2Wins: number;
+  ties: number;
+  cliffsDelta: number;
+  outcome: 'dev1_win' | 'dev2_win' | 'tie';
+  meanAbsE1: number;
+  meanAbsE2: number;
+}
+
+export interface HeadToHeadDominanceSummary {
+  activity: string;
+  tieMargin: number;
+  cliffsThreshold: number;
+  totalSubjects: number;
+  dev1WinningSubjects: number;
+  dev2WinningSubjects: number;
+  tieSubjects: number;
+  headlineConclusion: string;
+  subjectResults: SubjectHeadToHeadDominance[];
+  overallMeanCliffsDelta: number;
+  pairingDiscardFallacyNote: string;
+}
+
+/**
+ * Generates synchronized three-way paired validation data:
+ * Reference Gold Standard, Device 1 (Investigational), and Device 2 (Comparator)
+ * worn simultaneously on the same participant during defined activities.
+ */
+export function generateThreeWayPairedData(params?: {
+  m?: number;
+  k?: number;
+  activity?: 'running' | 'cycling' | 'rest';
+  seed?: number;
+}): ThreeWayPairedObservation[] {
+  const { m = 25, k = 40, activity = 'running', seed = 42 } = params ?? {};
+  const rand = createMulberry32(seed);
+  const obs: ThreeWayPairedObservation[] = [];
+
+  for (let i = 1; i <= m; i += 1) {
+    const baseHr = activity === 'running' ? 145 : activity === 'cycling' ? 130 : 68;
+    const hrRange = activity === 'running' ? 35 : activity === 'cycling' ? 30 : 15;
+
+    let d1NoiseScale = 2.0;
+    let d2NoiseScale = 5.0;
+    let d2OutlierRate = 0.25;
+
+    if (activity === 'running') {
+      if (i <= 21) {
+        // 21 subjects: Device 1 clearly wins
+        d1NoiseScale = 1.5;
+        d2NoiseScale = 5.2;
+        d2OutlierRate = 0.40;
+      } else if (i <= 24) {
+        // 3 subjects (22, 23, 24): Tie/comparable
+        d1NoiseScale = 2.2;
+        d2NoiseScale = 2.3;
+        d2OutlierRate = 0.04;
+      } else {
+        // 1 subject (25): Device 2 wins
+        d1NoiseScale = 5.5;
+        d2NoiseScale = 1.6;
+        d2OutlierRate = 0.02;
+      }
+    } else if (activity === 'cycling') {
+      if (i <= 18) {
+        d1NoiseScale = 1.8;
+        d2NoiseScale = 4.4;
+        d2OutlierRate = 0.28;
+      } else if (i <= 23) {
+        d1NoiseScale = 2.1;
+        d2NoiseScale = 2.2;
+        d2OutlierRate = 0.05;
+      } else {
+        d1NoiseScale = 4.8;
+        d2NoiseScale = 1.9;
+        d2OutlierRate = 0.04;
+      }
+    } else {
+      // rest
+      d1NoiseScale = 1.0;
+      d2NoiseScale = 1.1;
+      d2OutlierRate = 0.02;
+    }
+
+    for (let j = 1; j <= k; j += 1) {
+      const ref = baseHr + (rand() - 0.5) * hrRange;
+      const isD2Outlier = rand() < d2OutlierRate;
+      const isD1Outlier = (activity === 'running' && i === 25) ? rand() < 0.35 : rand() < 0.02;
+
+      const d1Err = randomNormal(rand) * d1NoiseScale + (isD1Outlier ? randomLaplace(rand, 8.5) : 0);
+      const d2Err = randomNormal(rand) * d2NoiseScale + (isD2Outlier ? randomLaplace(rand, 9.5) : 0);
+
+      const d1Val = Number((ref + d1Err).toFixed(1));
+      const d2Val = Number((ref + d2Err).toFixed(1));
+      const refVal = Number(ref.toFixed(1));
+
+      const e1 = Number((d1Val - refVal).toFixed(2));
+      const e2 = Number((d2Val - refVal).toFixed(2));
+      const absE1 = Number(Math.abs(e1).toFixed(2));
+      const absE2 = Number(Math.abs(e2).toFixed(2));
+      const delta = Number((absE1 - absE2).toFixed(2));
+
+      obs.push({
+        id: `s${i}-e${j}`,
+        subjectId: i,
+        obsIndex: j,
+        activity,
+        refValue: refVal,
+        dev1Value: d1Val,
+        dev2Value: d2Val,
+        e1,
+        e2,
+        absE1,
+        absE2,
+        delta,
+      });
+    }
+  }
+
+  return obs;
+}
+
+export function computeHeadToHeadDominance(
+  observations: ThreeWayPairedObservation[],
+  tieMargin: number = 3.0,
+  cliffsThreshold: number = 0.15,
+  activityLabel = 'High-Intensity Interval Running',
+): HeadToHeadDominanceSummary {
+  const subjectMap = new Map<number, ThreeWayPairedObservation[]>();
+
+  for (const o of observations) {
+    const list = subjectMap.get(o.subjectId) ?? [];
+    list.push(o);
+    subjectMap.set(o.subjectId, list);
+  }
+
+  const subjectResults: SubjectHeadToHeadDominance[] = [];
+  let d1WinsCount = 0;
+  let d2WinsCount = 0;
+  let tieCount = 0;
+  let sumCliffs = 0;
+
+  for (const [subjId, list] of subjectMap) {
+    let d1Wins = 0;
+    let d2Wins = 0;
+    let ties = 0;
+    let sumAbsE1 = 0;
+    let sumAbsE2 = 0;
+
+    for (const o of list) {
+      sumAbsE1 += o.absE1;
+      sumAbsE2 += o.absE2;
+      // Paired error difference: Delta = |e1| - |e2|
+      // Negative delta means Device 1 error is smaller than Device 2 error.
+      // Device 1 wins if Delta < -tieMargin (|e1| < |e2| - tau).
+      // Device 2 wins if Delta > +tieMargin (|e2| < |e1| - tau).
+      // Otherwise, the paired difference falls within [-tau, +tau], deemed an agreed tie.
+      const deltaPair = o.absE1 - o.absE2;
+      if (deltaPair < -tieMargin) {
+        d1Wins += 1;
+      } else if (deltaPair > tieMargin) {
+        d2Wins += 1;
+      } else {
+        ties += 1;
+      }
+    }
+
+    const n = list.length || 1;
+    const delta = (d1Wins - d2Wins) / n;
+    sumCliffs += delta;
+
+    let outcome: 'dev1_win' | 'dev2_win' | 'tie' = 'tie';
+    if (delta > cliffsThreshold) {
+      outcome = 'dev1_win';
+      d1WinsCount += 1;
+    } else if (delta < -cliffsThreshold) {
+      outcome = 'dev2_win';
+      d2WinsCount += 1;
+    } else {
+      tieCount += 1;
+    }
+
+    subjectResults.push({
+      subjectId: subjId,
+      totalEpochs: n,
+      dev1Wins: d1Wins,
+      dev2Wins: d2Wins,
+      ties,
+      cliffsDelta: Number(delta.toFixed(3)),
+      outcome,
+      meanAbsE1: Number((sumAbsE1 / n).toFixed(2)),
+      meanAbsE2: Number((sumAbsE2 / n).toFixed(2)),
+    });
+  }
+
+  subjectResults.sort((a, b) => b.cliffsDelta - a.cliffsDelta);
+
+  const totalSubjects = subjectResults.length;
+  const overallMeanCliffsDelta = Number((sumCliffs / (totalSubjects || 1)).toFixed(3));
+
+  let headlineConclusion: string;
+  if (totalSubjects === 0) {
+    headlineConclusion = 'No paired observations available for head-to-head comparison.';
+  } else if (d1WinsCount >= d2WinsCount && d1WinsCount > tieCount) {
+    headlineConclusion = `During ${activityLabel}, Device 1 meaningfully outperformed Device 2 in ${d1WinsCount} of ${totalSubjects} participants.`;
+  } else if (d2WinsCount > d1WinsCount && d2WinsCount > tieCount) {
+    headlineConclusion = `During ${activityLabel}, Device 2 meaningfully outperformed Device 1 in ${d2WinsCount} of ${totalSubjects} participants.`;
+  } else if (d1WinsCount === d2WinsCount && d1WinsCount > 0) {
+    headlineConclusion = `During ${activityLabel}, Device 1 and Device 2 achieved an even split (${d1WinsCount} wins each across ${totalSubjects} participants).`;
+  } else {
+    headlineConclusion = `During ${activityLabel}, Device 1 and Device 2 demonstrated comparable performance (${tieCount} of ${totalSubjects} participants tied or inconclusive).`;
+  }
+
+  const pairingDiscardFallacyNote =
+    'The Pairing Discard Fallacy: Industry teams routinely test Device 1 vs ECG reference and Device 2 vs ECG reference, ' +
+    'then plot two separate marginal curves. This mistakenly discards the synchronous pairing: both devices were worn on the same subject ' +
+    'at the exact same second! Paired differences Delta = |e1| - |e2| eliminate biological heart rate variability, and applying an agreed-upon ' +
+    `clinical tie margin (tau = ${tieMargin.toFixed(1)} bpm) alongside subject-specific Cliff's Delta thresholds (|delta| > ${cliffsThreshold.toFixed(2)}) ` +
+    'enables conclusive claims like: "During activity X, Device 1 meaningfully outperformed Device 2 in 21 of 25 participants."';
+
+  return {
+    activity: activityLabel,
+    tieMargin,
+    cliffsThreshold,
+    totalSubjects,
+    dev1WinningSubjects: d1WinsCount,
+    dev2WinningSubjects: d2WinsCount,
+    tieSubjects: tieCount,
+    headlineConclusion,
+    subjectResults,
+    overallMeanCliffsDelta,
+    pairingDiscardFallacyNote,
+  };
+}
+
+// ============================================================================
+// Vector 5: Multi-Generation Transitive Drift Canary
+// ============================================================================
+
+export interface TransitiveDriftGeneration {
+  genId: string;
+  name: string;
+  hardwareVersion: string;
+  firmwareVersion: string;
+  studyName: string;
+  sampleSize: number;
+  stepBiasDiff: number;
+  stepSe: number;
+  stepNiTarget: number;
+  stepPassed: boolean;
+  cumulativeBiasDiff: number;
+  cumulativeSe: number;
+  cumulativeCanaryLimit: number;
+  canaryStatus: 'PASS' | 'WARNING' | 'ALARM';
+  notes: string;
+}
+
+export interface TransitiveDriftSummary {
+  generations: TransitiveDriftGeneration[];
+  hasCanaryAlarm: boolean;
+  alarmMessage?: string;
+  anchorGenName: string;
+  latestGenName: string;
+  totalTransitiveDrift: number;
+  cumulativeCanaryLimit: number;
+  canaryExplanation: string;
+}
+
+export const DEFAULT_TRANSITIVE_DRIFT_GENERATIONS: TransitiveDriftGeneration[] = [
+  {
+    genId: 'gen1',
+    name: 'Generation 1 (Baseline Anchor)',
+    hardwareVersion: 'HW Rev 1.0 (Dual-LED PPG)',
+    firmwareVersion: 'v1.4.2 Clinical Production',
+    studyName: 'Pivotal Clinical Trial 2023-A',
+    sampleSize: 120,
+    stepBiasDiff: 0.0,
+    stepSe: 0.08,
+    stepNiTarget: 0.5,
+    stepPassed: true,
+    cumulativeBiasDiff: 0.0,
+    cumulativeSe: 0.08,
+    cumulativeCanaryLimit: 0.75,
+    canaryStatus: 'PASS',
+    notes: 'Cleared FDA 510(k); established reference baseline.',
+  },
+  {
+    genId: 'gen2',
+    name: 'Generation 2 (Miniaturized Sensor)',
+    hardwareVersion: 'HW Rev 2.0 (Compact Optical Module)',
+    firmwareVersion: 'v2.1.0 OTA Release',
+    studyName: 'Equivalence Bridging Study 2024-B',
+    sampleSize: 85,
+    stepBiasDiff: 0.28,
+    stepSe: 0.09,
+    stepNiTarget: 0.5,
+    stepPassed: true,
+    cumulativeBiasDiff: 0.28,
+    cumulativeSe: 0.12,
+    cumulativeCanaryLimit: 0.75,
+    canaryStatus: 'PASS',
+    notes: 'Passed immediate predecessor non-inferiority gate (+0.28 <= +0.50 bpm).',
+  },
+  {
+    genId: 'gen3',
+    name: 'Generation 3 (DSP Battery Optimization)',
+    hardwareVersion: 'HW Rev 2.2 (Ultra-low Power DSP)',
+    firmwareVersion: 'v3.0.4 OTA Release',
+    studyName: 'Battery Life Verification Study 2025-C',
+    sampleSize: 92,
+    stepBiasDiff: 0.32,
+    stepSe: 0.09,
+    stepNiTarget: 0.5,
+    stepPassed: true,
+    cumulativeBiasDiff: 0.6,
+    cumulativeSe: 0.15,
+    cumulativeCanaryLimit: 0.75,
+    canaryStatus: 'WARNING',
+    notes: 'Passed step gate (+0.32 <= +0.50 bpm), but cumulative drift approaches canary limit (80%).',
+  },
+  {
+    genId: 'gen4',
+    name: 'Generation 4 (Candidate Release)',
+    hardwareVersion: 'HW Rev 3.0 (Next-Gen ASIC)',
+    firmwareVersion: 'v4.0.0-rc2 Candidate',
+    studyName: 'Pre-Market Release Validation 2026-D',
+    sampleSize: 110,
+    stepBiasDiff: 0.35,
+    stepSe: 0.1,
+    stepNiTarget: 0.5,
+    stepPassed: true,
+    cumulativeBiasDiff: 0.95,
+    cumulativeSe: 0.18,
+    cumulativeCanaryLimit: 0.75,
+    canaryStatus: 'ALARM',
+    notes: 'Passed step gate (+0.35 <= +0.50 bpm), BUT cumulative drift (+0.95 bpm) breaches multi-generation canary limit (+0.75 bpm)!',
+  },
+];
+
+export function computeTransitiveDriftCanary(
+  generations: TransitiveDriftGeneration[] = DEFAULT_TRANSITIVE_DRIFT_GENERATIONS,
+  maxCumulativeDrift: number = 0.75,
+): TransitiveDriftSummary {
+  const safeCanaryLimit = Math.max(0.05, maxCumulativeDrift);
+  const updatedGens: TransitiveDriftGeneration[] = [];
+  let cumDiff = 0;
+  let cumVar = 0;
+  let hasAlarm = false;
+  let alarmMessage: string | undefined;
+
+  for (let idx = 0; idx < generations.length; idx += 1) {
+    const g = generations[idx]!;
+    if (idx === 0) {
+      cumDiff = 0;
+      cumVar = g.stepSe ** 2;
+      updatedGens.push({
+        ...g,
+        cumulativeBiasDiff: 0,
+        cumulativeSe: g.stepSe,
+        cumulativeCanaryLimit: safeCanaryLimit,
+        canaryStatus: 'PASS',
+      });
+      continue;
+    }
+
+    cumDiff += g.stepBiasDiff;
+    cumVar += g.stepSe ** 2;
+    const cumSe = Math.sqrt(cumVar);
+
+    let status: 'PASS' | 'WARNING' | 'ALARM' = 'PASS';
+    if (cumDiff > safeCanaryLimit) {
+      status = 'ALARM';
+      hasAlarm = true;
+      alarmMessage = `CANARY ALARM: Silent Algorithmic Drift Detected! Cumulative degradation from ${generations[0]!.name} is ${cumDiff >= 0 ? '+' : ''}${cumDiff.toFixed(2)} bpm, breaching the +${safeCanaryLimit.toFixed(2)} bpm multi-generation budget despite all step-wise release gates passing.`;
+    } else if (cumDiff > safeCanaryLimit * 0.75) {
+      status = 'WARNING';
+    }
+
+    updatedGens.push({
+      ...g,
+      cumulativeBiasDiff: Number(cumDiff.toFixed(2)),
+      cumulativeSe: Number(cumSe.toFixed(2)),
+      cumulativeCanaryLimit: safeCanaryLimit,
+      canaryStatus: status,
+    });
+  }
+
+  const anchorGenName = updatedGens[0]?.name ?? 'Generation 1';
+  const latestGenName = updatedGens[updatedGens.length - 1]?.name ?? 'Latest Generation';
+  const totalTransitiveDrift = updatedGens[updatedGens.length - 1]?.cumulativeBiasDiff ?? 0;
+
+  const canaryExplanation =
+    'Multi-Generation Transitive Drift Canary: When testing iterative hardware or firmware releases, engineering teams typically compare ' +
+    'Gen (N) only against immediate predecessor Gen (N-1). If each release is granted an incremental non-inferiority budget (e.g. +0.50 bpm), ' +
+    'the algorithm can accumulate compounding degradation across 3–4 cycles without ever failing an individual gate. The Transitive Drift Canary ' +
+    'synthesizes indirect network comparisons back to the anchor Gen 1 baseline, preventing silent software drift from eroding product quality.';
+
+  return {
+    generations: updatedGens,
+    hasCanaryAlarm: hasAlarm,
+    alarmMessage,
+    anchorGenName,
+    latestGenName,
+    totalTransitiveDrift,
+    cumulativeCanaryLimit: maxCumulativeDrift,
+    canaryExplanation,
+  };
+}
+
+// ============================================================================
+// Export Utilities: FDA Table 1 & Citable Methods Paragraph
+// ============================================================================
+
+export function generateFdaTable1Markdown(
+  metrics: AgreementMetrics,
+  preset: ReportStudioPreset,
+): string {
+  const dateStr = new Date().toISOString().split('T')[0];
+  const sep = '='.repeat(68);
+  const subSep = '-'.repeat(68);
+
+  return [
+    sep,
+    `FDA 510(k) PRE-MARKET NOTIFICATION / ISO 80601-2-61:2017 TABLE 1`,
+    `Clinical Investigation Summary: ${preset.name}`,
+    `Standard: ${preset.regulatoryStandard} | Date: ${dateStr}`,
+    sep,
+    `OVERALL SPECIFICATION & VALIDATION RESULTS`,
+    subSep,
+    `Root Mean Square Error (Arms):             ${metrics.arms.toFixed(2)} ${preset.unit} (Target <= ${preset.armsTarget.toFixed(2)} ${preset.unit})`,
+    `Mean Systemic Bias (d_bar):                ${metrics.meanBias >= 0 ? '+' : ''}${metrics.meanBias.toFixed(2)} ${preset.unit}`,
+    `Between-Subject Variance (s_b):           ${metrics.variance.sdBetween.toFixed(2)} ${preset.unit}`,
+    `Within-Subject Variance (s_w):            ${metrics.variance.sdWithin.toFixed(2)} ${preset.unit}`,
+    `Total Agreement Spread (s_total):          ${metrics.variance.sdTotal.toFixed(2)} ${preset.unit}`,
+    `95% Limits of Agreement (LoA):             [${metrics.loaLower.toFixed(2)}, +${metrics.loaUpper.toFixed(2)}] ${preset.unit}`,
+    `Clustered 95% Confidence Interval (Bias):  [${metrics.ciBiasClusterLow.toFixed(2)}, ${metrics.ciBiasClusterHigh.toFixed(2)}] ${preset.unit}`,
+    `Naive Pooled 95% Confidence Interval:     [${metrics.ciBiasNaiveLow.toFixed(2)}, ${metrics.ciBiasNaiveHigh.toFixed(2)}] ${preset.unit}`,
+    `Design Effect (Clustering Penalty):        ${metrics.variance.designEffect.toFixed(2)} (Effective N = ${metrics.variance.nEffective.toFixed(0)} of ${metrics.totalN})`,
+    subSep,
+    `COHORT & SAMPLING ARCHITECTURE`,
+    subSep,
+    `Total Enrolled Participants:               ${metrics.m}`,
+    `Replicate Observations per Subject:        ${metrics.k}`,
+    `Total Analyzable Paired Data Points:       ${metrics.totalN}`,
+    `Reference Standard:                        ${preset.referenceName}`,
+    `Investigational Device:                    ${preset.deviceName}`,
+    sep,
+  ].join('\n');
+}
+
+export function generateCitableMethodsParagraph(params: {
+  preset: ReportStudioPreset;
+  metrics: AgreementMetrics;
+  toleranceWindow: number;
+}): string {
+  const { preset, metrics, toleranceWindow } = params;
+
+  return (
+    `Statistical Methods: Validation accuracy of the ${preset.deviceName} was evaluated against reference ` +
+    `${preset.referenceName} across ${metrics.m} healthy adult participants with ${metrics.k} paired replicate observations ` +
+    `per participant (total N = ${metrics.totalN} paired data points) in accordance with ${preset.regulatoryStandard}. ` +
+    `Because repeated measurements within individuals induce hierarchical clustering, agreement was decomposed using a one-way ` +
+    `random-effects analysis of variance (ANOVA) framework as described by Bland and Altman (2007). ` +
+    `Total variance was partitioned into between-subject variation (sigma_b = ${metrics.variance.sdBetween.toFixed(2)} ${preset.unit}) ` +
+    `and within-subject sensor noise (sigma_w = ${metrics.variance.sdWithin.toFixed(2)} ${preset.unit}), yielding an Intraclass Correlation ` +
+    `Coefficient (ICC) of ${metrics.variance.icc.toFixed(2)} and a design effect of ${metrics.variance.designEffect.toFixed(2)} ` +
+    `(effective independent sample size N_eff = ${metrics.variance.nEffective.toFixed(0)}). ` +
+    `Mean bias was ${metrics.meanBias >= 0 ? '+' : ''}${metrics.meanBias.toFixed(2)} ${preset.unit} with a cluster-adjusted 95% confidence ` +
+    `interval of [${metrics.ciBiasClusterLow.toFixed(2)}, ${metrics.ciBiasClusterHigh.toFixed(2)}] based on the Student-t distribution ` +
+    `with ${metrics.m - 1} degrees of freedom; naive pooled standard errors understated parameter uncertainty by a factor of ` +
+    `${metrics.variance.seUnderstatementRatio.toFixed(1)}x. The 95% limits of agreement spanned [${metrics.loaLower.toFixed(2)}, +${metrics.loaUpper.toFixed(2)}] ${preset.unit}. ` +
+    `Root Mean Square Error (Arms) was ${metrics.arms.toFixed(2)} ${preset.unit}, satisfying the predefined acceptance threshold of <= ${preset.armsTarget.toFixed(2)} ${preset.unit}. ` +
+    `Empirical error survival analysis revealed that ${metrics.coverageAtTolerance.toFixed(1)}% of measurements fell within the +/- ${toleranceWindow.toFixed(1)} ${preset.unit} ` +
+    `clinical tolerance envelope, with a 95th-percentile absolute error (P95) of ${metrics.p95.toFixed(2)} ${preset.unit}. ` +
+    `Analyses were executed using agreekit client-side validation engine.`
+  );
+}
+

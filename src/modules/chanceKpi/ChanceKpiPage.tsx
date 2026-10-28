@@ -177,6 +177,7 @@ export default function ChanceKpiPage() {
 
   return (
     <ModulePage
+      eyebrow="REPORT STUDIO"
       title="Did we pass our KPIs by chance?"
       method="Permutation null distribution & Preiss–Fisher separation index"
       currentN={activeSampleSize}
@@ -975,6 +976,12 @@ export default function ChanceKpiPage() {
             title: 'Report findings across stakeholders',
             description:
               'Present clinical tolerance scorecards, Bland–Altman agreement, and survival of error.',
+          },
+          {
+            to: '/academy',
+            title: 'Validation Academy: Case Studies',
+            description:
+              'See false-pass hazards and Winner\'s Curse dynamics in action across the 8 Meridian PulseBand 2 modules.',
           },
           {
             to: '/agreement',

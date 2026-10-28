@@ -52,6 +52,7 @@ export default function DemographicsPage() {
 
   return (
     <ModulePage
+      eyebrow="PROTOCOL STUDIO"
       title="Who do I need to recruit?"
       currentN={sampleSize}
       method="Demographic segment planner"
@@ -330,6 +331,12 @@ export default function DemographicsPage() {
             to: '/precision',
             title: 'How precise will my study be?',
             description: 'Check this total still delivers the precision you need.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Evaluate performance across demographic strata in the executive launch scorecard.',
           },
         ]}
       />

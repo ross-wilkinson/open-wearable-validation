@@ -79,6 +79,7 @@ export default function TimelinePage() {
 
   return (
     <ModulePage
+      eyebrow="PROTOCOL STUDIO"
       title="How long will it take?"
       currentN={study.n}
       method="Study duration Monte Carlo"
@@ -419,6 +420,12 @@ export default function TimelinePage() {
             title: 'How precise will my study be?',
             description:
               'Confirm the sample size this timeline assumes actually delivers the precision you need.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Transition from timeline planning to product launch evaluation and stakeholder scorecards.',
           },
         ]}
       />

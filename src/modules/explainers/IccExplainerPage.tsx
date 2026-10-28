@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
+import NextSteps from '../../app/study/NextSteps.tsx';
 import { AUTHOR } from '../../content/author.ts';
 import { ICC_DATASETS, computeIcc, type IccDatasetId } from './iccModel.ts';
 
@@ -37,7 +38,12 @@ export default function IccExplainerPage() {
   return (
     <article className="mx-auto flex max-w-3xl flex-col gap-8">
       <header>
-        <p className="text-sm font-medium text-series-1">Explainer</p>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="inline-flex items-center rounded-md bg-series-1/10 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-series-1">
+            PITFALL EXPLORER
+          </span>
+          <span className="text-xs font-medium text-ink-muted">Explainer</span>
+        </div>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Agreement is not ICC
         </h1>
@@ -283,6 +289,23 @@ export default function IccExplainerPage() {
           device and how much is the recruiting.
         </p>
       </section>
+
+      <NextSteps
+        steps={[
+          {
+            to: '/repeated-measures',
+            title: 'Protocol Studio: Repeated Measures',
+            description:
+              'Calculate genuine limits of agreement using random-effects variance decomposition.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Review Bland-Altman agreement alongside two-gate launch criteria.',
+          },
+        ]}
+      />
     </article>
   );
 }

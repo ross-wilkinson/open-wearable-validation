@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ICC_DATASETS, computeIcc } from './iccModel.ts';
 import { compareErrorMetrics } from './errorMetricsModel.ts';
+import { DEFAULT_SNIFF_PROTOTYPES, simulateSniffTest } from './sniffTestModel.ts';
 import { modulesFixture } from '../../stats/testing/fixtures.ts';
 
 describe('computeIcc', () => {
@@ -118,3 +119,71 @@ describe('compareErrorMetrics', () => {
     );
   });
 });
+
+describe('simulateSniffTest', () => {
+  it('demonstrates Winner’s Curse at N=5: true best prototype loses >55% of the time', () => {
+    const res = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 5, 3.0, 3000, 42);
+
+    expect(res.sampleSize).toBe(5);
+    expect(res.noiseSd).toBe(3.0);
+    // Winner's Curse: noise causes another prototype to win ~65% of the time
+    expect(res.winnerCurseRate).toBeGreaterThan(55);
+    expect(res.winnerCurseRate).toBeLessThan(80);
+    expect(res.trueWinnerWinRate).toBeGreaterThan(20);
+    expect(res.trueWinnerWinRate).toBeLessThan(45);
+
+    // Over-optimism: winning candidate appears to perform better than its true error
+    expect(res.expectedWinnerOverOptimism).toBeGreaterThan(0.2);
+
+    // Elimination power: flawed prototype E (8.5 bpm) is caught and eliminated >95%
+    expect(res.flawedEliminationRate).toBeGreaterThan(95);
+  });
+
+  it('mitigates Winner’s Curse when N is increased to 35', () => {
+    const res = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 35, 3.0, 3000, 42);
+
+    expect(res.sampleSize).toBe(35);
+    // With true errors 2.0 vs 2.3 bpm (gap 0.3) and SE=0.51 bpm, win rate climbs from ~30% (at N=5) to ~58%
+    expect(res.trueWinnerWinRate).toBeGreaterThan(50);
+    expect(res.winnerCurseRate).toBeLessThan(50);
+
+    // Elimination of catastrophic flaw is virtually 100%
+    expect(res.flawedEliminationRate).toBeGreaterThan(99.5);
+  });
+
+  it('is deterministic for a given seed', () => {
+    const run1 = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 5, 3.0, 1000, 123);
+    const run2 = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 5, 3.0, 1000, 123);
+
+    expect(run1.winnerCurseRate).toBe(run2.winnerCurseRate);
+    expect(run1.trueWinnerWinRate).toBe(run2.trueWinnerWinRate);
+    expect(run1.flawedEliminationRate).toBe(run2.flawedEliminationRate);
+    expect(run1.expectedWinnerOverOptimism).toBe(run2.expectedWinnerOverOptimism);
+  });
+
+  it('safely clamps sampleSize below 3 and noiseSd below 0.5', () => {
+    const res = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 1, 0.1, 500, 42);
+
+    expect(res.sampleSize).toBe(3);
+    expect(res.noiseSd).toBe(0.5);
+    expect(res.prototypes.length).toBe(DEFAULT_SNIFF_PROTOTYPES.length);
+  });
+
+  it('computes well-formed confidence intervals and rates across all prototypes', () => {
+    const res = simulateSniffTest(DEFAULT_SNIFF_PROTOTYPES, 5, 3.0, 1000, 42);
+
+    for (const proto of res.prototypes) {
+      expect(proto.ciUpper).toBeGreaterThan(proto.sampleMean);
+      expect(proto.ciLower).toBeLessThanOrEqual(proto.sampleMean);
+      expect(proto.winRate).toBeGreaterThanOrEqual(0);
+      expect(proto.winRate).toBeLessThanOrEqual(100);
+      expect(proto.eliminationRate).toBeGreaterThanOrEqual(0);
+      expect(proto.eliminationRate).toBeLessThanOrEqual(100);
+    }
+
+    // Sum of win counts must equal total iterations
+    const totalWins = res.prototypes.reduce((acc, p) => acc + p.winCount, 0);
+    expect(totalWins).toBe(1000);
+  });
+});
+

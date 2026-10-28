@@ -13,13 +13,14 @@ import { createRng } from '../../stats/random.ts';
 
 describe('chanceKpiModel', () => {
   describe('Presets', () => {
-    it('defines all 4 key clinical presets', () => {
-      expect(CHANCE_KPI_PRESETS).toHaveLength(4);
+    it('defines all 5 presets including rapid N=5 screen', () => {
+      expect(CHANCE_KPI_PRESETS).toHaveLength(5);
       const ids = CHANCE_KPI_PRESETS.map((p) => p.id);
       expect(ids).toContain('ambulatory-spo2');
       expect(ids).toContain('hypoxia-spo2');
       expect(ids).toContain('resting-temperature');
       expect(ids).toContain('exercise-heart-rate');
+      expect(ids).toContain('rapid-n5-screen');
     });
 
     it('retrieves preset by ID and throws on invalid ID', () => {
@@ -83,6 +84,24 @@ describe('chanceKpiModel', () => {
 
       expect(result.chancePassingRate).toBeLessThan(0.1);
       expect(result.hazardVerdict).toBe('DEFENSIBLE');
+    });
+
+    it('demonstrates Rapid N=5 Screen permutation properties and threshold computation', () => {
+      const preset = getChancePreset('rapid-n5-screen');
+      expect(preset.sampleSize).toBe(5);
+      expect(preset.proposedKpi).toBe(3.5);
+
+      const result = runChanceKpiAnalysis({
+        ...preset,
+        iterations: 2000,
+        seed: 42,
+      });
+
+      expect(result.sampleSize).toBe(5);
+      expect(result.chancePassingRate).toBeGreaterThanOrEqual(0);
+      expect(result.defensible5PctThreshold).toBeGreaterThan(0);
+      expect(result.meanChanceMetric).toBeGreaterThan(0);
+      expect(result.analyticalChanceRmse).toBeGreaterThan(0);
     });
   });
 

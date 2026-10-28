@@ -1,8 +1,11 @@
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { StudyProvider } from './study/StudyContext.tsx';
+import ScrollToTop from '../components/layout/ScrollToTop.tsx';
 import NavBar from '../components/layout/NavBar.tsx';
 import Footer from '../components/layout/Footer.tsx';
 import HomePage from '../pages/HomePage.tsx';
+import ReferenceDeviceCatalogLandingPage from '../pages/ReferenceDeviceCatalogLandingPage.tsx';
+import ReferenceDevicesPage from '../modules/referenceDevices/ReferenceDevicesPage.tsx';
 import PrecisionPage from '../modules/precision/PrecisionPage.tsx';
 import AgreementPage from '../modules/agreement/AgreementPage.tsx';
 import RepeatedMeasuresPage from '../modules/repeatedMeasures/RepeatedMeasuresPage.tsx';
@@ -15,25 +18,34 @@ import ExplainersPage from '../pages/ExplainersPage.tsx';
 import AboutPage from '../pages/AboutPage.tsx';
 import RmseExplainerPage from '../modules/explainers/RmseExplainerPage.tsx';
 import IccExplainerPage from '../modules/explainers/IccExplainerPage.tsx';
+import SniffTestExplainerPage from '../modules/explainers/SniffTestExplainerPage.tsx';
+import AcademyPage from '../modules/academy/AcademyPage.tsx';
+import ProtocolStudioLandingPage from '../pages/ProtocolStudioLandingPage.tsx';
+import ReportStudioLandingPage from '../pages/ReportStudioLandingPage.tsx';
+import AgreekitLandingPage from '../pages/AgreekitLandingPage.tsx';
+import HealthDataLandingPage from '../pages/HealthDataLandingPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 
 /**
- * HashRouter, not BrowserRouter — deliberately.
+ * BrowserRouter for clean URLs and client-side deep linking.
  *
- * This deploys to GitHub Pages, a static file server with no rewrite rules. A
- * BrowserRouter deep link like /precision would be requested from the server as
- * a real path, 404, and never reach the app. With `#/precision` the browser
- * never sends the fragment to the server at all, so no 404.html shim is needed.
+ * Configured with SPA rewrite rules in `vercel.json` so direct hits and refreshes
+ * on deep routes (e.g. `/agreement`, `/report-studio`, `/academy`) route cleanly
+ * through `/index.html` without hash fragments.
  */
 export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
+      <ScrollToTop />
       <StudyProvider>
         <div className="flex min-h-screen flex-col">
           <NavBar />
           <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/reference-device-catalog" element={<ReferenceDeviceCatalogLandingPage />} />
+              <Route path="/reference-devices" element={<ReferenceDevicesPage />} />
+              <Route path="/protocol/reference-devices" element={<ReferenceDevicesPage />} />
               <Route path="/agreement" element={<AgreementPage />} />
               <Route path="/repeated-measures" element={<RepeatedMeasuresPage />} />
               <Route path="/precision" element={<PrecisionPage />} />
@@ -48,6 +60,20 @@ export default function App() {
                 path="/explainers/agreement-vs-icc"
                 element={<IccExplainerPage />}
               />
+              <Route
+                path="/explainers/sniff-test"
+                element={<SniffTestExplainerPage />}
+              />
+              <Route path="/academy" element={<AcademyPage />} />
+              <Route path="/curriculum" element={<AcademyPage />} />
+              <Route path="/protocol-studio" element={<ProtocolStudioLandingPage />} />
+              <Route path="/protocol" element={<ProtocolStudioLandingPage />} />
+              <Route path="/report-studio-overview" element={<ReportStudioLandingPage />} />
+              <Route path="/report-studio/overview" element={<ReportStudioLandingPage />} />
+              <Route path="/report-overview" element={<ReportStudioLandingPage />} />
+              <Route path="/agreekit" element={<AgreekitLandingPage />} />
+              <Route path="/health-data-distributions" element={<HealthDataLandingPage />} />
+              <Route path="/health-data-catalog" element={<HealthDataLandingPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
@@ -55,6 +81,6 @@ export default function App() {
           <Footer />
         </div>
       </StudyProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }

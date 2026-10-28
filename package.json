@@ -1,5 +1,5 @@
 {
-  "name": "validation-study-designer",
+  "name": "open-wearable-validation",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -44,6 +44,7 @@
     "jsdom": "^30.0.1",
     "postcss": "^8.5.25",
     "prettier": "^3.9.6",
+    "puppeteer-core": "^25.16.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",

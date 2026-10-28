@@ -121,4 +121,11 @@ describe('PrecisionPage', () => {
 
     expect(neededTable().getAllByText(/more than 200/i).length).toBeGreaterThan(0);
   });
+
+  it('renders PROTOCOL STUDIO pillar badge and NextSteps workflow bridge cards', () => {
+    renderWithStudy(<PrecisionPage />);
+
+    expect(screen.getByText('PROTOCOL STUDIO')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /report studio: launch gates/i })).toBeInTheDocument();
+  });
 });

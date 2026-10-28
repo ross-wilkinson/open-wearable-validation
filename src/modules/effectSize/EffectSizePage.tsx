@@ -71,6 +71,7 @@ export default function EffectSizePage() {
 
   return (
     <ModulePage
+      eyebrow="REPORT STUDIO"
       title="How big is the effect, and how sure am I?"
       currentN={n}
       method="Cohen's d confidence intervals from the non-central t"
@@ -351,6 +352,12 @@ export default function EffectSizePage() {
             title: 'Misled by RMSE and MAE',
             description:
               'Why a single summary number can hide what your users actually experience.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Translate effect sizes and non-inferiority margins into two-gate launch decisions.',
           },
         ]}
       />

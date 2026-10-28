@@ -52,3 +52,19 @@ export const PREISS_FISHER_2008: Citation = {
   url: 'https://doi.org/10.1007/s10877-008-9127-y',
 };
 
+export const WILKINSON_2023: Citation = {
+  text: 'Wilkinson RD, Mazzo MR, Feeney DF. Rethinking the statistical analysis of neuromechanical data. Exerc Sport Sci Rev. 2023;51(1):43-50.',
+  url: 'https://doi.org/10.1249/JES.0000000000000308',
+};
+
+export const ISO_80601_2_61: Citation = {
+  text: 'International Organization for Standardization. ISO 80601-2-61:2019 Medical electrical equipment — Part 2-61: Particular requirements for basic safety and essential performance of pulse oximeter equipment. Geneva: ISO; 2019.',
+  url: 'https://www.iso.org/standard/67963.html',
+};
+
+export const ISO_81060_2: Citation = {
+  text: 'International Organization for Standardization. ISO 81060-2:2018/Amd 1:2020 Non-invasive sphygmomanometers — Part 2: Clinical investigation of intermittent automated measurement type. Geneva: ISO; 2020.',
+  url: 'https://www.iso.org/standard/73339.html',
+};
+
+

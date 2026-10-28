@@ -4,12 +4,14 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { Info, Sparkles } from 'lucide-react';
 import ModulePage from '../../components/common/ModulePage.tsx';
 import MethodsText from '../../components/common/MethodsText.tsx';
 import NumberField from '../../components/common/NumberField.tsx';
@@ -20,9 +22,14 @@ import NextSteps from '../../app/study/NextSteps.tsx';
 import { useStudy } from '../../app/study/StudyContext.tsx';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
 import {
+  PAIRED_ALGORITHM_PRESETS,
+  correlationSweep,
   loaPrecisionCurve,
+  sampleSizeForAttrition,
   sampleSizeForEquivalence,
   sampleSizeForThreshold,
+  sampleSizePairedNonInferiority,
+  type PairedAlgorithmPreset,
 } from './agreementModel.ts';
 
 const CONFIDENCE_OPTIONS = [
@@ -37,7 +44,7 @@ const LEGEND = [
 ];
 
 export default function AgreementPage() {
-  const { study } = useStudy();
+  const { study, updateStudy } = useStudy();
   const [threshold, setThreshold] = useState(15 / 54);
   // Seeded from the plan on mount. Routing unmounts a page on navigation, so
   // mounting is exactly the moment the plan should be picked up — and after
@@ -62,8 +69,94 @@ export default function AgreementPage() {
     [alpha, power, sigma, delta, epsilon],
   );
 
+  // Paired Algorithm Non-Inferiority State
+  const [selectedPairedPresetId, setSelectedPairedPresetId] = useState<string>('firmware-hr');
+  const [pairedMargin, setPairedMargin] = useState<number>(1.5);
+  const [pairedDelta, setPairedDelta] = useState<number>(0.0);
+  const [pairedSigma, setPairedSigma] = useState<number>(5.0);
+  const [pairedRho, setPairedRho] = useState<number>(0.94);
+  const [pairedAlpha, setPairedAlpha] = useState<number>(0.05);
+  const [pairedPower, setPairedPower] = useState<number>(0.90);
+  const [pairedUnit, setPairedUnit] = useState<string>('bpm');
+  const [pairedHigherIsBetter, setPairedHigherIsBetter] = useState<boolean>(false);
+  const [expectedYieldPct, setExpectedYieldPct] = useState<number>(70);
+
+  function applyPairedPreset(preset: PairedAlgorithmPreset) {
+    setSelectedPairedPresetId(preset.id);
+    setPairedMargin(preset.margin);
+    setPairedDelta(preset.delta);
+    const sigmaVal =
+      preset.sigma ??
+      (preset.sigmaPair && preset.rho !== undefined
+        ? preset.sigmaPair / Math.sqrt(2 * (1 - preset.rho))
+        : 5.0);
+    setPairedSigma(sigmaVal);
+    if (preset.rho !== undefined) setPairedRho(preset.rho);
+    setPairedAlpha(preset.alpha);
+    setPairedPower(preset.power);
+    setPairedUnit(preset.unit);
+    setPairedHigherIsBetter(preset.higherIsBetter ?? false);
+  }
+
+  const pairedN = useMemo(
+    () =>
+      sampleSizePairedNonInferiority({
+        margin: pairedMargin,
+        delta: pairedDelta,
+        sigma: pairedSigma,
+        rho: pairedRho,
+        alpha: pairedAlpha,
+        power: pairedPower,
+        higherIsBetter: pairedHigherIsBetter,
+      }),
+    [pairedMargin, pairedDelta, pairedSigma, pairedRho, pairedAlpha, pairedPower, pairedHigherIsBetter],
+  );
+
+  const uncoupledN = useMemo(
+    () =>
+      sampleSizePairedNonInferiority({
+        margin: pairedMargin,
+        delta: pairedDelta,
+        sigma: pairedSigma,
+        rho: 0.0,
+        alpha: pairedAlpha,
+        power: pairedPower,
+        higherIsBetter: pairedHigherIsBetter,
+      }),
+    [pairedMargin, pairedDelta, pairedSigma, pairedAlpha, pairedPower, pairedHigherIsBetter],
+  );
+
+  const rhoCurve = useMemo(
+    () =>
+      correlationSweep(
+        {
+          margin: pairedMargin,
+          delta: pairedDelta,
+          sigma: pairedSigma,
+          alpha: pairedAlpha,
+          power: pairedPower,
+          higherIsBetter: pairedHigherIsBetter,
+        },
+        0.0,
+        0.98,
+        0.02,
+      ),
+    [pairedMargin, pairedDelta, pairedSigma, pairedAlpha, pairedPower, pairedHigherIsBetter],
+  );
+
+  const enrolledN = useMemo(() => {
+    if (!pairedN || expectedYieldPct <= 0 || expectedYieldPct > 100) return null;
+    return sampleSizeForAttrition(pairedN, (100 - expectedYieldPct) / 100);
+  }, [pairedN, expectedYieldPct]);
+
+  const activePairedPreset = useMemo(
+    () => PAIRED_ALGORITHM_PRESETS.find((p) => p.id === selectedPairedPresetId),
+    [selectedPairedPresetId],
+  );
+
   return (
     <ModulePage
+      eyebrow="PROTOCOL STUDIO"
       title="How many participants do I need?"
       method="Sample size for a limits-of-agreement threshold"
       intro={
@@ -296,6 +389,307 @@ export default function AgreementPage() {
         </Link>
       </div>
 
+      <section aria-labelledby="paired-non-inferiority" className="space-y-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-6 items-center justify-center rounded-full bg-series-1/10 text-series-1">
+              <Sparkles size={14} aria-hidden />
+            </span>
+            <h2
+              id="paired-non-inferiority"
+              className="text-sm font-semibold uppercase tracking-wide text-ink-muted"
+            >
+              Paired Algorithm Non-Inferiority (Firmware Update on Same Data)
+            </h2>
+          </div>
+          <p className="mt-1 text-sm text-ink-secondary">
+            Exploiting error correlation (ρ) on identical sensor streams avoids the 10× oversizing error committed by generic AI agents.
+          </p>
+        </div>
+
+        {/* Presets */}
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+            Evaluation Presets
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {PAIRED_ALGORITHM_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={selectedPairedPresetId === p.id}
+                onClick={() => applyPairedPreset(p)}
+                className={`flex flex-col justify-between rounded-xl border p-3 text-left transition-colors ${
+                  selectedPairedPresetId === p.id
+                    ? 'border-series-1 bg-series-1/10 text-series-1'
+                    : 'border-hairline bg-surface text-ink-secondary hover:bg-ink/5'
+                }`}
+              >
+                <div>
+                  <p className="text-xs font-semibold text-ink">{p.name}</p>
+                  <p className="mt-0.5 text-[11px] text-ink-muted">{p.domain}</p>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t border-hairline/60 pt-2 text-xs">
+                  <span className="text-ink-muted">ρ = {p.rho}</span>
+                  <span className="font-semibold text-series-1">
+                    N = {p.pairedN} <span className="text-[10px] font-normal text-ink-muted">(vs {p.uncorrelatedN})</span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        {activePairedPreset && (
+          <p className="flex gap-2 rounded-lg border border-hairline bg-surface p-3 text-xs leading-relaxed text-ink-secondary">
+            <Info size={16} aria-hidden className="mt-0.5 shrink-0 text-series-1" />
+            <span>{activePairedPreset.description}</span>
+          </p>
+        )}
+
+        {/* Correlation Slider & Sizing Result Grid */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+          <div className="flex flex-col gap-4 rounded-xl border border-hairline bg-surface p-5">
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="paired-rho-slider" className="text-sm font-medium text-ink">
+                  Paired Error Correlation (ρ)
+                </label>
+                <span className="font-mono text-base font-bold text-series-1">
+                  ρ = {pairedRho.toFixed(2)}
+                </span>
+              </div>
+              <input
+                id="paired-rho-slider"
+                type="range"
+                min={0.0}
+                max={0.98}
+                step={0.01}
+                value={pairedRho}
+                onChange={(e) => {
+                  setPairedRho(Number(e.target.value));
+                  setSelectedPairedPresetId('custom');
+                }}
+                className="mt-2 w-full accent-[var(--color-series-1)]"
+              />
+              <div className="flex justify-between text-[11px] text-ink-muted">
+                <span>ρ = 0.00 (Uncorrelated / Independent)</span>
+                <span>ρ = 0.50 (Moderate)</span>
+                <span>ρ = 0.95 (Extreme Pairing)</span>
+              </div>
+            </div>
+
+            {/* Interactive Correlation vs N Curve */}
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={rhoCurve} margin={{ top: 8, right: 16, bottom: 20, left: 0 }}>
+                  <CartesianGrid stroke={CHART.grid} vertical={false} />
+                  <XAxis
+                    dataKey="rho"
+                    type="number"
+                    domain={[0, 1]}
+                    tick={AXIS_TICK}
+                    tickFormatter={(v: number) => v.toFixed(1)}
+                    label={{
+                      value: 'Pairing Correlation (ρ)',
+                      position: 'insideBottom',
+                      offset: -12,
+                      style: AXIS_LABEL,
+                    }}
+                  />
+                  <YAxis
+                    domain={[0, 'auto']}
+                    tick={AXIS_TICK}
+                    width={40}
+                    label={{
+                      value: 'Required N',
+                      angle: -90,
+                      position: 'insideLeft',
+                      offset: 10,
+                      style: AXIS_LABEL,
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-hairline)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v) => [`${v} subjects`, 'Sample Size']}
+                    labelFormatter={(label) => `Correlation ρ = ${Number(label).toFixed(2)}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="n"
+                    name="Required N"
+                    stroke={seriesColor(1)}
+                    strokeWidth={2.5}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  {pairedN !== null && (
+                    <ReferenceDot
+                      x={pairedRho}
+                      y={pairedN}
+                      r={5}
+                      fill={seriesColor(1)}
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Configurable Parameters */}
+            <div className="grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2 lg:grid-cols-5">
+              <NumberField
+                label={`Margin Δ (${pairedUnit})`}
+                value={pairedMargin}
+                onChange={(v) => {
+                  setPairedMargin(v);
+                  setSelectedPairedPresetId('custom');
+                }}
+                min={0.001}
+                step={pairedUnit === 'κ' ? 0.005 : 0.1}
+              />
+              <NumberField
+                label={`Expected Diff δ (${pairedUnit})`}
+                value={pairedDelta}
+                onChange={(v) => {
+                  setPairedDelta(v);
+                  setSelectedPairedPresetId('custom');
+                }}
+                step={pairedUnit === 'κ' ? 0.005 : 0.1}
+                hint="Expected difference. For errors, δ > 0 is degradation. For Kappa, δ < 0 is degradation."
+              />
+              <NumberField
+                label={`Marginal SD σ (${pairedUnit})`}
+                value={pairedSigma}
+                onChange={(v) => {
+                  setPairedSigma(v);
+                  setSelectedPairedPresetId('custom');
+                }}
+                min={0.001}
+                step={pairedUnit === 'κ' ? 0.01 : 0.5}
+              />
+              <NumberField
+                label="Alpha (one-sided)"
+                value={pairedAlpha}
+                onChange={(v) => {
+                  setPairedAlpha(v);
+                  setSelectedPairedPresetId('custom');
+                }}
+                min={0.005}
+                max={0.2}
+                step={0.005}
+              />
+              <NumberField
+                label="Target Power"
+                value={pairedPower}
+                onChange={(v) => {
+                  setPairedPower(v);
+                  setSelectedPairedPresetId('custom');
+                }}
+                min={0.5}
+                max={0.99}
+                step={0.05}
+              />
+            </div>
+          </div>
+
+          {/* Sizing Stat Box */}
+          <div className="flex min-w-64 flex-col justify-between rounded-xl border border-hairline bg-surface p-5">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Paired Sample Size
+              </span>
+              <p className="mt-2 text-4xl font-bold tracking-tight text-ink">
+                {pairedN ?? '—'}
+                <span className="ml-1.5 text-sm font-normal text-ink-muted">subjects</span>
+              </p>
+              {pairedN === null ? (
+                <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+                  Degradation |δ| exceeds non-inferiority margin Δ. Non-inferiority cannot be demonstrated.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-ink-secondary">
+                  at ρ = {pairedRho.toFixed(2)} &bull; paired variance σ²_pair ={' '}
+                  {(2 * pairedSigma ** 2 * (1 - pairedRho)) < 0.1
+                    ? (2 * pairedSigma ** 2 * (1 - pairedRho)).toFixed(4)
+                    : (2 * pairedSigma ** 2 * (1 - pairedRho)).toFixed(2)}{' '}
+                  {pairedUnit}²
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 border-t border-hairline pt-3 space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-ink-muted">Uncoupled AI Agent Sizing (ρ=0):</span>
+                <span className="font-semibold text-ink">{uncoupledN ?? '—'}</span>
+              </div>
+              {uncoupledN && pairedN && uncoupledN > pairedN && (
+                <div className="rounded-lg bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+                  <p className="font-semibold">
+                    Recruitment Reduction: {uncoupledN - pairedN} participants (
+                    {(((uncoupledN - pairedN) / uncoupledN) * 100).toFixed(0)}%)
+                  </p>
+                  <p className="mt-0.5 text-[11px] opacity-90">
+                    Saves estimated ~${((uncoupledN - pairedN) * 1300).toLocaleString()} in recruitment &amp; clinical costs.
+                  </p>
+                </div>
+              )}
+
+              {/* Real-World Study Yield & Enrollment Inflation */}
+              <div className="rounded-lg border border-hairline bg-surface-raised p-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-ink">Study Protocol Yield:</span>
+                  <span className="font-mono font-semibold text-series-1">{expectedYieldPct}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={40}
+                  max={100}
+                  step={5}
+                  value={expectedYieldPct}
+                  aria-label="Expected study protocol yield percentage"
+                  onChange={(e) => setExpectedYieldPct(Number(e.target.value))}
+                  className="mt-1.5 w-full accent-[var(--color-series-1)]"
+                />
+                <div className="mt-1 flex items-baseline justify-between border-t border-hairline/60 pt-1 text-[11px]">
+                  <span className="text-ink-muted">Required Enrolled:</span>
+                  <span className="font-bold text-ink">
+                    {enrolledN ?? '—'} participants
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-ink-muted leading-tight">
+                  Inflation for EEG/sensor detachment, SQI gating, and alignment dropouts.
+                </p>
+              </div>
+
+              {pairedN !== null && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetN = enrolledN ?? pairedN;
+                    updateStudy({
+                      n: targetN,
+                      confidence: Number((1 - pairedAlpha).toFixed(4)),
+                      nSource: 'paired algorithm non-inferiority',
+                    });
+                  }}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-series-1/40 bg-series-1/10 px-3 py-1.5 text-xs font-semibold text-series-1 transition-colors hover:bg-series-1/20"
+                >
+                  <Sparkles size={13} aria-hidden />
+                  Carry {enrolledN ?? pairedN} into study plan
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section aria-labelledby="equivalence">
         <h2
           id="equivalence"
@@ -420,6 +814,12 @@ export default function AgreementPage() {
             title: 'How precise will my study be?',
             description:
               'See what this sample size buys you for bias, limits of agreement, and error percentiles.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Once data is collected, synthesize findings into two-gate decision scorecards and Bland-Altman agreement.',
           },
         ]}
       />

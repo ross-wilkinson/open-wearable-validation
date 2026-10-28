@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { AlertTriangle } from 'lucide-react';
 import ChartLegend from '../../components/common/ChartLegend.tsx';
+import NextSteps from '../../app/study/NextSteps.tsx';
 import { AXIS_LABEL, AXIS_TICK, CHART, seriesColor } from '../../styles/chartTheme.ts';
 import { AUTHOR } from '../../content/author.ts';
 import { compareErrorMetrics } from './errorMetricsModel.ts';
@@ -27,7 +28,12 @@ export default function RmseExplainerPage() {
   return (
     <article className="mx-auto flex max-w-3xl flex-col gap-8">
       <header>
-        <p className="text-sm font-medium text-series-1">Explainer</p>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="inline-flex items-center rounded-md bg-series-1/10 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-series-1">
+            PITFALL EXPLORER
+          </span>
+          <span className="text-xs font-medium text-ink-muted">Explainer</span>
+        </div>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Misled by RMSE and MAE
         </h1>
@@ -270,6 +276,23 @@ export default function RmseExplainerPage() {
           number.
         </p>
       </section>
+
+      <NextSteps
+        steps={[
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Error Distribution',
+            description:
+              'Inspect empirical survival of error and cumulative error coverage curves on wearable datasets.',
+          },
+          {
+            to: '/agreement',
+            title: 'Protocol Studio: Sample Size',
+            description:
+              'Size your study for limits of agreement rather than fragile RMSE targets.',
+          },
+        ]}
+      />
     </article>
   );
 }

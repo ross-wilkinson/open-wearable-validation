@@ -3,10 +3,9 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 beforeEach(() => {
-  // HashRouter reads the real window.location.hash, and jsdom keeps that value
-  // across tests within a file — a test that navigates leaks its destination
-  // into the next one. Resetting here rather than after the first confusing
-  // failure.
+  // Reset window history pathname and hash across tests so routing state
+  // doesn't leak between tests.
+  window.history.pushState({}, '', '/');
   window.location.hash = '';
   localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
@@ -63,3 +62,5 @@ Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
   configurable: true,
   value: 400,
 });
+
+window.scrollTo = vi.fn();

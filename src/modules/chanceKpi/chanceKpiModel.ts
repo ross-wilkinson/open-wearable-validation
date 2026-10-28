@@ -191,6 +191,23 @@ export const CHANCE_KPI_PRESETS: ChanceKpiPreset[] = [
     metric: 'rmse',
     sampleSize: 100,
   },
+  {
+    id: 'rapid-n5-screen',
+    name: "Rapid N=5 Prototype Screen ('Sniff Test')",
+    shortName: 'N=5 Sniff Screen',
+    description:
+      "Hardware engineering quick screen testing 5 candidates on 5 subjects. Small N combined with narrow dynamic range creates a severe chance-pass hazard and wide noise, illustrating why N=5 cannot pick a winner among close contenders.",
+    hazardNote:
+      "The Sniff Test Trap: With N=5, random sampling noise exceeds the true difference between prototypes. An apparent winner is almost always lucky noise (Winner's Curse). Use N=5 strictly to eliminate catastrophic losers, never to select a winner.",
+    referenceMean: 72.0,
+    referenceSd: 3.5,
+    deviceBias: 0.2,
+    deviceErrorSd: 3.0,
+    proposedKpi: 3.5,
+    unit: 'bpm',
+    metric: 'rmse',
+    sampleSize: 5,
+  },
 ];
 
 export function getChancePreset(id: string): ChanceKpiPreset {

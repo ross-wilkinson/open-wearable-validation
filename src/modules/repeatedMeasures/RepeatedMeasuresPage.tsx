@@ -218,6 +218,7 @@ export default function RepeatedMeasuresPage() {
 
   return (
     <ModulePage
+      eyebrow="PROTOCOL STUDIO"
       title="How many subjects and replicates do I need?"
       currentN={m}
       method="Within-subject repeated measures & variance decomposition"
@@ -972,6 +973,12 @@ export default function RepeatedMeasuresPage() {
               title: 'Estimate study duration with Monte Carlo',
               description:
                 'Simulate screening, repeated-visit lab testing, and analysis timelines.',
+            },
+            {
+              to: '/report-studio',
+              title: 'Report Studio: Launch Gates',
+              description:
+                'Synthesize multi-replicate study results into two-gate launch decisions and Bland-Altman agreement clusters.',
             },
           ]}
         />

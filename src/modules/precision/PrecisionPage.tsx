@@ -100,6 +100,7 @@ export default function PrecisionPage() {
 
   return (
     <ModulePage
+      eyebrow="PROTOCOL STUDIO"
       title="How precise will my study be?"
       currentN={selectedN}
       method="Bias, limits of agreement, and error percentiles against n"
@@ -391,6 +392,12 @@ export default function PrecisionPage() {
             to: '/timeline',
             title: 'How long will it take?',
             description: 'Simulate the phases and get a completion date with a range.',
+          },
+          {
+            to: '/report-studio',
+            title: 'Report Studio: Launch Gates',
+            description:
+              'Carry precision margins into 4-quadrant decision matrices and stakeholder scorecards.',
           },
         ]}
       />

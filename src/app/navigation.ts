@@ -34,6 +34,16 @@ export interface ModuleRoute {
 
 export const MODULE_ROUTES: ModuleRoute[] = [
   {
+    path: '/reference-devices',
+    label: 'Reference standards',
+    title: 'Which reference standard should I validate against?',
+    method: 'Reference device selection, predicate chains & measurement error allocation',
+    blurb:
+      'Explore Gold, Silver, and Bronze reference standards across 12 biometric domains. Evaluate FDA 510(k) predicates, data pipeline friction, hardware sync triggers, and sample size inflation from reference noise.',
+    status: 'ready',
+    inNav: true,
+  },
+  {
     path: '/agreement',
     label: 'Sample size',
     title: 'How many participants do I need?',
@@ -135,5 +145,118 @@ export const EXPLAINER_ROUTES: ModuleRoute[] = [
       'Two datasets with identical paired differences, ICC 0.20 and 0.99. A high ICC can be bought by recruiting a wider range of subjects.',
     status: 'ready',
     inNav: false,
+  },
+  {
+    path: '/explainers/sniff-test',
+    label: 'N=5 Sniff Test',
+    title: 'The Sniff Test Trap',
+    method: "Winner's curse and elimination power in rapid prototyping",
+    blurb:
+      'An N=5 screen cannot pick a winner out of noise — the apparent winner is usually just lucky noise. But it can reliably eliminate catastrophic losers.',
+    status: 'ready',
+    inNav: false,
+  },
+];
+
+export interface PlatformPillar {
+  id: string;
+  number: number;
+  name: string;
+  eyebrow: string;
+  tagline: string;
+  description: string;
+  path: string;
+  workspaces?: string[];
+}
+
+export const PLATFORM_PILLARS: PlatformPillar[] = [
+  {
+    id: 'validation-academy',
+    number: 1,
+    name: 'The Validation Academy',
+    eyebrow: 'PILLAR 01',
+    tagline: 'Interactive Wearable Validation Studios',
+    description:
+      'The central web suite hosting 4 specialized workspaces: Learning Studio, Protocol Studio, Report Studio, and Pitfall Explorer.',
+    path: '/academy',
+    workspaces: ['Learning Studio', 'Protocol Studio', 'Report Studio', 'Pitfall Explorer'],
+  },
+  {
+    id: 'agreekit',
+    number: 2,
+    name: 'agreekit',
+    eyebrow: 'PILLAR 02',
+    tagline: 'Python Agreement Engine, CLI & MCP Server',
+    description:
+      'An open-source Python engine for exact measurement agreement, Bland-Altman variance decompositions, and non-inferiority testing.',
+    path: '/agreekit',
+  },
+  {
+    id: 'health-data-catalog',
+    number: 3,
+    name: 'Health Data Catalog',
+    eyebrow: 'PILLAR 03',
+    tagline: 'CDC NHANES & SCIN Population Reference Baselines',
+    description:
+      'Reference distributions across diverse subject demographics and health measures to establish realistic baselines before protocol authoring.',
+    path: '/health-data-distributions',
+  },
+  {
+    id: 'reference-device-catalog',
+    number: 4,
+    name: 'Reference Device Catalog',
+    eyebrow: 'PILLAR 04',
+    tagline: 'Clinical Gold Standards & 510(k) Predicates',
+    description:
+      'Comprehensive 10-dimension comparator profiles across 12 biometric domains evaluating FDA 510(k) predicates and sample size inflation from reference noise.',
+    path: '/reference-device-catalog',
+  },
+];
+
+export interface AcademyStudio {
+  id: string;
+  name: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  path: string;
+}
+
+export const ACADEMY_STUDIOS: AcademyStudio[] = [
+  {
+    id: 'learning-studio',
+    name: 'Learning Studio',
+    eyebrow: 'LEARNING STUDIO',
+    title: 'Meridian PulseBand 2 Case Study',
+    description:
+      'Fictional product journey across 8 interactive modules spanning prototyping, launch gates, and multi-year lifecycle audits.',
+    path: '/academy',
+  },
+  {
+    id: 'protocol-studio',
+    name: 'Protocol Studio',
+    eyebrow: 'PROTOCOL STUDIO',
+    title: 'Study Design & Sample Sizing',
+    description:
+      'Design protocols with limits-of-agreement precision, repeated measures ANOVA, demographic quotas, and Monte Carlo timelines.',
+    path: '/protocol-studio',
+  },
+  {
+    id: 'report-studio',
+    name: 'Report Studio',
+    eyebrow: 'REPORT STUDIO',
+    title: 'Decision Scorecards & Launch Gates',
+    description:
+      'Synthesize results into clinical tolerance scorecards, bivariate launch gates, and hierarchical variance breakdowns.',
+    path: '/report-studio/overview',
+  },
+  {
+    id: 'pitfall-explorer',
+    name: 'Pitfall Explorer',
+    eyebrow: 'PITFALL EXPLORER',
+    title: 'Statistical Hazard Explainers',
+    description:
+      'Interactive explainers on why generic difference tests, unadjusted p-values, and naive correlations fail on paired wearable data.',
+    path: '/explainers',
   },
 ];
