@@ -10,7 +10,7 @@ describe('HomePage Portal', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: /measure ground truth\. validate with confidence\./i,
+        name: /validate wearable sensors & health algorithms/i,
       }),
     ).toBeInTheDocument();
 

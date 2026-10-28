@@ -8,7 +8,7 @@ describe('App shell', () => {
     render(<App />);
     expect(
       screen.getByRole('heading', {
-        name: /measure ground truth\. validate with confidence\./i,
+        name: /validate wearable sensors & health algorithms/i,
       }),
     ).toBeInTheDocument();
   });

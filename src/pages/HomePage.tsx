@@ -11,463 +11,237 @@ import {
   Sliders,
   Sparkles,
   Terminal,
-  Zap,
 } from 'lucide-react';
 import { OpenWearableValidationLogo } from '../components/brand/OpenWearableValidationLogo.tsx';
 import { AgreekitLogo } from '../components/brand/AgreekitLogo.tsx';
 
 /* ============================================================================
- * 1. HERO CENTERPIECE: CLINICAL BIOSENSOR VALIDATION INSTRUMENT
- *    Authentic physiological validation data science:
- *    - Mode A: Real-time Bland-Altman Agreement Plot (ΔHR vs Mean HR) with 95% LoA
- *    - Mode B: Synchronized Beat Interval Tachogram (ECG R-R vs PPG Peak-to-Peak)
+ * 1. HERO VISUAL SIGNPOST
+ *    Cinematic software art & illuminated biosensor validation signpost
  * ============================================================================ */
-function HeroClinicalInstrument() {
-  const [viewMode, setViewMode] = useState<'bland-altman' | 'tachogram'>('bland-altman');
-  const [motionProvocation, setMotionProvocation] = useState(false);
+function HeroVisualSignpost() {
   const uid = useId().replace(/:/g, '');
-  const corridorGradId = `hero-corridor-${uid}`;
-
-  // 32 Realistic paired cardiac observations: Mean HR (X: 55-145 bpm) vs Difference (Y: Test - Ref bpm)
-  // Baseline: tight clustering around bias +0.34 bpm within [-3.8, +4.5] bpm
-  // Motion provoked: variance inflation + cadence-lock divergence at higher HR
-  const scatterPoints = [
-    { mean: 58, diff: 0.2, provDiff: 0.4 },
-    { mean: 62, diff: -0.8, provDiff: -1.2 },
-    { mean: 65, diff: 0.5, provDiff: 0.8 },
-    { mean: 68, diff: 1.1, provDiff: 1.9 },
-    { mean: 71, diff: -0.3, provDiff: -0.6 },
-    { mean: 73, diff: 0.4, provDiff: 1.1 },
-    { mean: 76, diff: -1.2, provDiff: -1.8 },
-    { mean: 79, diff: 0.7, provDiff: 1.4 },
-    { mean: 82, diff: 0.1, provDiff: 0.5 },
-    { mean: 85, diff: -0.6, provDiff: -1.1 },
-    { mean: 88, diff: 1.4, provDiff: 2.8 },
-    { mean: 91, diff: 0.3, provDiff: 1.2 },
-    { mean: 94, diff: -0.9, provDiff: -2.1 },
-    { mean: 97, diff: 0.6, provDiff: 2.3 },
-    { mean: 101, diff: 0.2, provDiff: 1.8 },
-    { mean: 104, diff: -1.4, provDiff: -3.5 },
-    { mean: 108, diff: 0.8, provDiff: 3.2 },
-    { mean: 112, diff: 1.2, provDiff: 4.6 },
-    { mean: 115, diff: -0.4, provDiff: -2.8 },
-    { mean: 119, diff: 0.9, provDiff: 5.4 },
-    { mean: 122, diff: -1.1, provDiff: -4.2 },
-    { mean: 126, diff: 1.5, provDiff: 6.8 },
-    { mean: 129, diff: 0.4, provDiff: 3.9 },
-    { mean: 132, diff: -0.7, provDiff: -5.1 },
-    { mean: 135, diff: 1.8, provDiff: 8.2 },
-    { mean: 138, diff: 0.5, provDiff: 4.7 },
-    { mean: 141, diff: -1.5, provDiff: -6.4 },
-    { mean: 144, diff: 0.8, provDiff: 7.9 },
-  ];
-
-  // Tachogram extracted inter-beat interval time series (ms) for 24 cardiac cycles
-  const rriSeries = [842, 835, 828, 819, 812, 804, 796, 788, 782, 775, 768, 762, 758, 754, 750, 746, 742, 739, 736, 734, 731, 729, 727, 725];
-  const ppiBaseline = [840, 837, 826, 821, 810, 806, 794, 790, 780, 777, 766, 764, 756, 756, 748, 748, 740, 741, 734, 736, 729, 731, 725, 727];
-  const ppiMotion = [840, 837, 826, 821, 810, 835, 820, 842, 815, 830, 805, 822, 790, 810, 785, 802, 775, 792, 765, 780, 755, 770, 745, 760];
-  const activePpi = motionProvocation ? ppiMotion : ppiBaseline;
-
-  // Coordinate scales for 800x170 Bland-Altman SVG
-  // X: Mean HR [50..150] -> pixel [55..665]
-  // Y: Diff [-15..+15] -> pixel [145..15], centered at y=80 (0 bpm)
-  const mapMeanX = (m: number) => 55 + ((m - 50) / 100) * 610;
-  const mapDiffY = (d: number) => 80 - (d / 15) * 65;
-
-  // LoA values
-  const upperLoA = motionProvocation ? 8.4 : 4.48;
-  const lowerLoA = motionProvocation ? -6.8 : -3.8;
-  const meanBias = motionProvocation ? 1.62 : 0.34;
+  const ppgGlowId = `hero-ppg-glow-${uid}`;
+  const ecgGlowId = `hero-ecg-glow-${uid}`;
+  const corridorGradId = `hero-loa-grad-${uid}`;
 
   return (
     <div className="relative mx-auto w-full max-w-5xl">
-      {/* Subtle atmospheric glow behind the clinical instrument */}
+      {/* 1. Ambient Background Halo */}
       <div
-        className="pointer-events-none absolute -inset-x-8 -top-10 h-72 rounded-full bg-gradient-to-r from-sky-500/10 via-emerald-500/10 to-indigo-500/10 blur-3xl opacity-70"
+        className="pointer-events-none absolute -inset-x-8 -top-12 h-80 rounded-full bg-gradient-to-r from-sky-500/15 via-cyan-500/12 to-emerald-500/15 blur-3xl opacity-75"
         aria-hidden="true"
       />
 
-      <div className="relative overflow-hidden rounded-2xl border border-hairline bg-[#090d16] text-slate-100 shadow-2xl">
-        {/* Top Instrument Control Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/90 bg-[#060911] px-5 py-3">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-2.5 w-2.5">
+      {/* 2. Main Hardware-Grade Glass Instrument Enclosure */}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-[#090d16] text-slate-100 shadow-2xl">
+        {/* Top Studio Signpost Navigation Tabs */}
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 bg-[#060911]/90 px-4 py-2.5 sm:px-6">
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-0.5 no-scrollbar">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 text-[11px] font-mono font-bold text-sky-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+              01 Signal &amp; LoA Evaluation
+            </span>
+            <Link
+              to="/protocol-studio"
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              02 Protocol &amp; Sample Size
+            </Link>
+            <Link
+              to="/report-studio/overview"
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              03 Launch Gate Scorecards
+            </Link>
+            <Link
+              to="/reference-device-catalog"
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors hidden md:inline-flex"
+            >
+              04 Reference &amp; Baselines
+            </Link>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-slate-400">
+            <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="font-mono text-xs font-bold tracking-wider uppercase text-slate-200">
-              Live Biosensor Validation Engine
+            <span>CALIBRATED STREAM</span>
+          </div>
+        </div>
+
+        {/* Sub-header: Live Paired Stream Specifications */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/60 bg-[#070b14]/60 px-5 py-2.5 text-xs font-mono text-slate-400">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              LIVE PAIRED SENSOR COMPARATOR
             </span>
-            <span className="rounded bg-slate-800/80 px-2 py-0.5 font-mono text-[10px] text-slate-400 border border-slate-700/60 hidden sm:inline">
-              500 Hz Sync • Paired Epoch Stream
+            <span className="rounded bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400 border border-slate-700/60">
+              500 HZ SYNC
+            </span>
+            <span className="text-slate-400 hidden sm:inline">
+              Test: <strong className="text-sky-400 font-semibold">Wrist Optical PPG</strong>
+            </span>
+            <span className="text-slate-400 hidden sm:inline">
+              Ref: <strong className="text-emerald-400 font-semibold">3-Lead ECG Holter</strong>
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* View Mode Toggle: LoA vs Tachogram */}
-            <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900/90 p-0.5 font-mono text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode('bland-altman')}
-                className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
-                  viewMode === 'bland-altman'
-                    ? 'bg-slate-800 text-sky-400 font-bold shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                LoA Scatter Plane
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('tachogram')}
-                className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
-                  viewMode === 'tachogram'
-                    ? 'bg-slate-800 text-emerald-400 font-bold shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                R-R vs Peak-to-Peak Sync
-              </button>
-            </div>
-
-            {/* Provocation Stress-Test Trigger */}
-            <button
-              type="button"
-              onClick={() => setMotionProvocation(!motionProvocation)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-mono font-semibold transition-all cursor-pointer ${
-                motionProvocation
-                  ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
-                  : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
+            <span className="rounded bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400 border border-slate-700/40">
+              Regime: Resting Baseline
+            </span>
+            <Link
+              to="/academy"
+              className="text-sky-400 hover:text-sky-300 transition-colors text-[11px] font-semibold flex items-center gap-1"
             >
-              <Zap size={12} className={motionProvocation ? 'text-amber-400' : 'text-slate-500'} />
-              <span>{motionProvocation ? 'Cadence Lock Provoked' : 'Resting Baseline'}</span>
-            </button>
+              <span>Explore Studios</span>
+              <ArrowRight size={11} />
+            </Link>
           </div>
         </div>
 
-        {/* Analytical Visualization Stage */}
-        <div className="p-5 sm:p-6">
-          {viewMode === 'bland-altman' ? (
-            /* ================================================================
-             * VIEW A: TRUE BLAND-ALTMAN DIFFERENCE SCATTER PLOT
-             * ================================================================ */
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400">
-                <div className="flex items-center gap-4">
-                  <span className="inline-flex items-center gap-1.5 text-slate-300">
-                    <span className="h-2 w-2 rounded-full bg-sky-400" />
-                    Paired Observations (Δ = Test − Ref)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                    <span className="h-0.5 w-3 bg-emerald-400" />
-                    Mean Bias ({meanBias >= 0 ? `+${meanBias.toFixed(2)}` : meanBias.toFixed(2)} bpm)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-slate-400 hidden sm:inline-flex">
-                    <span className="h-0.5 w-3 bg-slate-500 border-dashed border-t" />
-                    95% LoA Corridor ([{lowerLoA.toFixed(1)}, +{upperLoA.toFixed(1)}] bpm)
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-500">ISO 80601-2-61 • N = 48 Paired Beats</span>
-              </div>
+        {/* The Oscilloscope + Limits of Agreement Display Canvas */}
+        <div className="relative p-5 sm:p-7 select-none">
+          <svg
+            viewBox="0 0 900 200"
+            className="w-full h-auto max-h-56 overflow-visible"
+            aria-hidden="true"
+          >
+            <defs>
+              <filter id={ppgGlowId} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id={ecgGlowId} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <linearGradient id={corridorGradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.12" />
+                <stop offset="50%" stopColor="#10b981" stopOpacity="0.04" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.12" />
+              </linearGradient>
+            </defs>
 
-              <svg viewBox="0 0 800 170" className="w-full h-auto select-none overflow-visible" aria-hidden="true">
-                <defs>
-                  <linearGradient id={corridorGradId} x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="0%"
-                      stopColor={motionProvocation ? '#f59e0b' : '#10b981'}
-                      stopOpacity="0.14"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={motionProvocation ? '#f59e0b' : '#10b981'}
-                      stopOpacity="0.03"
-                    />
-                  </linearGradient>
-                </defs>
+            {/* Shaded Agreement Corridor (95% Limits of Agreement Envelope) */}
+            <rect x="0" y="45" width="900" height="110" fill={`url(#${corridorGradId})`} />
 
-                {/* 95% LoA Shaded Corridor */}
-                <rect
-                  x="55"
-                  y={mapDiffY(upperLoA)}
-                  width="610"
-                  height={mapDiffY(lowerLoA) - mapDiffY(upperLoA)}
-                  fill={`url(#${corridorGradId})`}
-                />
+            {/* Sub-pixel Grid Lines */}
+            <line x1="0" y1="45" x2="900" y2="45" stroke="#1e293b" strokeDasharray="3 3" />
+            <line x1="0" y1="75" x2="900" y2="75" stroke="#1e293b" strokeDasharray="2 4" strokeOpacity="0.6" />
+            <line x1="0" y1="100" x2="900" y2="100" stroke="#334155" strokeWidth="1" strokeDasharray="6 3" />
+            <line x1="0" y1="125" x2="900" y2="125" stroke="#1e293b" strokeDasharray="2 4" strokeOpacity="0.6" />
+            <line x1="0" y1="155" x2="900" y2="155" stroke="#1e293b" strokeDasharray="3 3" />
 
-                {/* Horizontal Reference Lines */}
-                <line x1="55" y1="15" x2="665" y2="15" stroke="#1e293b" strokeDasharray="3 3" />
-                <line x1="55" y1={mapDiffY(10)} x2="665" y2={mapDiffY(10)} stroke="#1e293b" strokeDasharray="3 3" />
-                <line x1="55" y1={mapDiffY(5)} x2="665" y2={mapDiffY(5)} stroke="#1e293b" strokeDasharray="3 3" />
-                <line x1="55" y1={mapDiffY(0)} x2="665" y2={mapDiffY(0)} stroke="#475569" strokeWidth="1" strokeDasharray="4 2" />
-                <line x1="55" y1={mapDiffY(-5)} x2="665" y2={mapDiffY(-5)} stroke="#1e293b" strokeDasharray="3 3" />
-                <line x1="55" y1={mapDiffY(-10)} x2="665" y2={mapDiffY(-10)} stroke="#1e293b" strokeDasharray="3 3" />
-                <line x1="55" y1="150" x2="665" y2="150" stroke="#1e293b" />
-
-                {/* Vertical Reference Grid */}
-                {[60, 80, 100, 120, 140].map((bpm) => (
-                  <line
-                    key={bpm}
-                    x1={mapMeanX(bpm)}
-                    y1="15"
-                    x2={mapMeanX(bpm)}
-                    y2="150"
-                    stroke="#1e293b"
-                    strokeDasharray="3 3"
-                  />
-                ))}
-
-                {/* Upper 95% LoA Line */}
-                <line
-                  x1="55"
-                  y1={mapDiffY(upperLoA)}
-                  x2="665"
-                  y2={mapDiffY(upperLoA)}
-                  stroke={motionProvocation ? '#f59e0b' : '#10b981'}
-                  strokeWidth="1.5"
-                  strokeDasharray="5 3"
-                />
-                <text
-                  x="675"
-                  y={mapDiffY(upperLoA) + 4}
-                  fill={motionProvocation ? '#f59e0b' : '#10b981'}
-                  fontSize="10"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  +1.96 SD (+{upperLoA.toFixed(1)})
+            {/* Vertical Epoch Time-Sync Ticks (Every 150px) */}
+            {[150, 300, 450, 600, 750].map((x) => (
+              <g key={x}>
+                <line x1={x} y1="30" x2={x} y2="170" stroke="#1e293b" strokeDasharray="3 3" />
+                <text x={x} y="185" fill="#475569" fontSize="9" fontFamily="monospace" textAnchor="middle">
+                  t+{(x / 150).toFixed(1)}s
                 </text>
+              </g>
+            ))}
 
-                {/* Mean Bias Line */}
-                <line
-                  x1="55"
-                  y1={mapDiffY(meanBias)}
-                  x2="665"
-                  y2={mapDiffY(meanBias)}
-                  stroke="#38bdf8"
-                  strokeWidth="1.75"
-                />
-                <text
-                  x="675"
-                  y={mapDiffY(meanBias) + 4}
-                  fill="#38bdf8"
-                  fontSize="10"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  Bias ({meanBias >= 0 ? `+${meanBias.toFixed(1)}` : meanBias.toFixed(1)})
-                </text>
+            {/* LoA Corridor Boundary Lines */}
+            <line x1="0" y1="45" x2="900" y2="45" stroke="#10b981" strokeWidth="1" strokeDasharray="4 2" strokeOpacity="0.8" />
+            <text x="890" y="41" fill="#10b981" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
+              +1.96 SD (+4.5 bpm)
+            </text>
 
-                {/* Lower 95% LoA Line */}
-                <line
-                  x1="55"
-                  y1={mapDiffY(lowerLoA)}
-                  x2="665"
-                  y2={mapDiffY(lowerLoA)}
-                  stroke={motionProvocation ? '#f59e0b' : '#10b981'}
-                  strokeWidth="1.5"
-                  strokeDasharray="5 3"
-                />
-                <text
-                  x="675"
-                  y={mapDiffY(lowerLoA) + 4}
-                  fill={motionProvocation ? '#f59e0b' : '#10b981'}
-                  fontSize="10"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  −1.96 SD ({lowerLoA.toFixed(1)})
-                </text>
+            <line x1="0" y1="100" x2="900" y2="100" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.9" />
+            <text x="890" y="96" fill="#38bdf8" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
+              Mean Bias (+0.34 bpm)
+            </text>
 
-                {/* Scatter Points */}
-                {scatterPoints.map((pt, i) => {
-                  const val = motionProvocation ? pt.provDiff : pt.diff;
-                  const cx = mapMeanX(pt.mean);
-                  const cy = mapDiffY(val);
-                  const isOutlier = val > upperLoA || val < lowerLoA;
-                  return (
-                    <g key={i}>
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={isOutlier ? 4.5 : 3.5}
-                        fill={isOutlier ? '#f59e0b' : '#38bdf8'}
-                        stroke="#090d16"
-                        strokeWidth="1.5"
-                      />
-                      {isOutlier && (
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={7.5}
-                          fill="none"
-                          stroke="#f59e0b"
-                          strokeWidth="1"
-                          strokeDasharray="2 2"
-                        />
-                      )}
-                    </g>
-                  );
-                })}
+            <line x1="0" y1="155" x2="900" y2="155" stroke="#10b981" strokeWidth="1" strokeDasharray="4 2" strokeOpacity="0.8" />
+            <text x="890" y="167" fill="#10b981" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
+              -1.96 SD (-3.8 bpm)
+            </text>
 
-                {/* Axis Labels */}
-                <text x="360" y="165" fill="#64748b" fontSize="10" fontFamily="monospace" textAnchor="middle">
-                  Mean Heart Rate (ECG + PPG) / 2 [bpm]
-                </text>
-                <text
-                  x="15"
-                  y="85"
-                  fill="#64748b"
-                  fontSize="10"
-                  fontFamily="monospace"
-                  textAnchor="middle"
-                  transform="rotate(-90 15 85)"
-                >
-                  Δ (PPG − ECG) [bpm]
-                </text>
-              </svg>
-            </div>
-          ) : (
-            /* ================================================================
-             * VIEW B: EXTRACTED BEAT INTERVAL TACHOGRAM (R-R vs Peak-to-Peak)
-             * ================================================================ */
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400">
-                <div className="flex items-center gap-4">
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    Reference: Holter ECG R-R Interval (RRI)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-sky-400">
-                    <span className="h-2 w-2 rounded-full bg-sky-400" />
-                    Test: Optical PPG Inter-Pulse Interval (PPI)
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-500">Beat-by-Beat Temporal Alignment</span>
-              </div>
+            {/* Optical Wrist PPG Waveform (Smooth Cyan Arterial Pressure Wave) */}
+            <path
+              d="
+                M 0 102
+                C 30 102, 60 55, 90 55 C 110 55, 125 78, 140 73 C 155 68, 180 102, 210 102
+                C 240 102, 270 55, 300 55 C 320 55, 335 78, 350 73 C 365 68, 390 102, 420 102
+                C 450 102, 480 55, 510 55 C 530 55, 545 78, 560 73 C 575 68, 600 102, 630 102
+                C 660 102, 690 55, 720 55 C 740 55, 755 78, 770 73 C 785 68, 810 102, 840 102
+                C 860 102, 885 70, 900 65
+              "
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              filter={`url(#${ppgGlowId})`}
+            />
 
-              <svg viewBox="0 0 800 170" className="w-full h-auto select-none overflow-visible" aria-hidden="true">
-                {/* Horizontal Timing Grid */}
-                {[720, 760, 800, 840].map((ms) => {
-                  const y = 20 + ((860 - ms) / 160) * 125;
-                  return (
-                    <g key={ms}>
-                      <line x1="50" y1={y} x2="750" y2={y} stroke="#1e293b" strokeDasharray="3 3" />
-                      <text x="42" y={y + 3} fill="#64748b" fontSize="9" fontFamily="monospace" textAnchor="end">
-                        {ms} ms
-                      </text>
-                    </g>
-                  );
-                })}
+            {/* 3-Lead ECG Reference Waveform (Crisp Emerald QRS Complex) */}
+            <path
+              d="
+                M 0 100 L 55 100 L 64 96 L 72 100 L 80 100 L 84 112 L 90 28 L 96 122 L 102 100 L 114 100 L 124 92 L 134 100
+                L 265 100 L 274 96 L 282 100 L 290 100 L 294 112 L 300 28 L 306 122 L 312 100 L 324 100 L 334 92 L 344 100
+                L 475 100 L 484 96 L 492 100 L 500 100 L 504 112 L 510 28 L 516 122 L 522 100 L 534 100 L 544 92 L 554 100
+                L 685 100 L 694 96 L 702 100 L 710 100 L 714 112 L 720 28 L 726 122 L 732 100 L 744 100 L 754 92 L 764 100
+                L 895 100 L 900 100
+              "
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              filter={`url(#${ecgGlowId})`}
+            />
 
-                {/* ECG R-R Trace (Emerald) */}
-                <path
-                  d={rriSeries
-                    .map((val, idx) => {
-                      const x = 55 + idx * 30;
-                      const y = 20 + ((860 - val) / 160) * 125;
-                      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-                    })
-                    .join(' ')}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-
-                {/* PPG PPI Trace (Sky) */}
-                <path
-                  d={activePpi
-                    .map((val, idx) => {
-                      const x = 55 + idx * 30;
-                      const y = 20 + ((860 - val) / 160) * 125;
-                      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-                    })
-                    .join(' ')}
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeDasharray={motionProvocation ? '4 2' : undefined}
-                />
-
-                {/* Individual Beat Nodes */}
-                {rriSeries.map((val, idx) => {
-                  const x = 55 + idx * 30;
-                  const y = 20 + ((860 - val) / 160) * 125;
-                  return <circle key={idx} cx={x} cy={y} r="3" fill="#10b981" />;
-                })}
-                {activePpi.map((val, idx) => {
-                  const x = 55 + idx * 30;
-                  const y = 20 + ((860 - val) / 160) * 125;
-                  return <circle key={idx} cx={x} cy={y} r="2.5" fill="#38bdf8" />;
-                })}
-
-                {/* X-Axis Beat Index */}
-                <line x1="50" y1="150" x2="750" y2="150" stroke="#334155" />
-                <text x="400" y="165" fill="#64748b" fontSize="10" fontFamily="monospace" textAnchor="middle">
-                  Sequential Cardiac Beat Index (1 .. 24)
-                </text>
-              </svg>
-            </div>
-          )}
+            {/* Peak Synchronization Alignment Pins */}
+            {[90, 300, 510, 720].map((x) => (
+              <g key={x}>
+                <circle cx={x} cy="28" r="3.5" fill="#10b981" stroke="#060911" strokeWidth="1" />
+                <circle cx={x} cy="55" r="3.5" fill="#38bdf8" stroke="#060911" strokeWidth="1" />
+                <line x1={x} y1="28" x2={x} y2="55" stroke="#38bdf8" strokeWidth="1" strokeDasharray="2 2" strokeOpacity="0.7" />
+              </g>
+            ))}
+          </svg>
         </div>
 
-        {/* Bottom DOM Telemetry Strip — Crisp HTML Elements (Family.co style) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-slate-800/90 bg-[#060911] divide-x divide-slate-800/80">
-          <div className="px-5 py-3.5">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+        {/* Bottom Hardware Telemetry Readout Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-slate-800/80 bg-[#060911]/90 px-5 py-3.5 sm:px-6">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
               Mean Bias (d&#772;)
             </div>
-            <div
-              className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${
-                motionProvocation ? 'text-amber-400' : 'text-emerald-400'
-              }`}
-            >
-              {motionProvocation ? '+1.62 bpm' : '+0.34 bpm'}
+            <div className="text-sm sm:text-base font-mono font-bold text-emerald-400">
+              +0.34 bpm
             </div>
           </div>
 
-          <div className="px-5 py-3.5">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
               95% Limits of Agreement
             </div>
-            <div className="mt-0.5 font-mono text-base sm:text-lg font-bold text-slate-100">
-              {motionProvocation ? '[-6.8, +8.4] bpm' : '[-3.80, +4.48] bpm'}
+            <div className="text-sm sm:text-base font-mono font-bold text-slate-200">
+              [-3.8, +4.5] bpm
             </div>
           </div>
 
-          <div className="px-5 py-3.5">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
-              Concordance CCC (&rho;<sub>c</sub>)
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+              Statistical Model
             </div>
-            <div className="mt-0.5 font-mono text-base sm:text-lg font-bold text-sky-400">
-              {motionProvocation ? '0.941' : '0.988'}
+            <div className="text-xs sm:text-sm font-mono font-semibold text-sky-400">
+              Repeated-Measures ANOVA
             </div>
           </div>
 
-          <div className="px-5 py-3.5 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
-                Clinical Verdict
-              </div>
-              <div className="mt-1">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs font-bold ${
-                    motionProvocation
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      motionProvocation ? 'bg-amber-400' : 'bg-emerald-400'
-                    }`}
-                  />
-                  {motionProvocation ? 'CADENCE SENSITIVITY' : 'PASS • FDA 510(k) READY'}
-                </span>
-              </div>
+          <div className="flex flex-col justify-center">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5">
+              Clinical Gate Verdict
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-mono font-bold text-emerald-400 w-fit">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span>PASS &bull; FDA 510(k) READY</span>
             </div>
           </div>
         </div>
@@ -1116,15 +890,25 @@ export default function HomePage() {
           ===================================================================== */}
       <section className="space-y-10">
         <div className="mx-auto max-w-4xl text-center space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/90 px-4 py-1.5 text-xs font-mono font-semibold text-ink-secondary shadow-2xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span>OPEN-SOURCE VALIDATION</span>
-            <span className="text-ink-muted">&bull;</span>
-            <span className="text-sky-400">100% Local Browser Execution</span>
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold text-emerald-400 shadow-2xs backdrop-blur-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="tracking-wide uppercase font-mono text-[11px]">
+              Open Wearable Validation Studio
+            </span>
+            <span className="text-emerald-500/40">&bull;</span>
+            <span className="text-emerald-300/80 font-normal">
+              100% Local Browser Execution
+            </span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-ink leading-[1.04]">
-            Measure Ground Truth. Validate With Confidence.
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-ink leading-[1.05] max-w-4xl mx-auto">
+            Validate Wearable Sensors <br className="hidden sm:inline" />
+            <span className="bg-gradient-to-r from-sky-400 via-cyan-300 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(56,189,248,0.35)]">
+              &amp; Health Algorithms.
+            </span>
           </h1>
 
           <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl leading-relaxed text-ink-secondary font-normal">
@@ -1166,8 +950,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Clinical Biosensor Validation Instrument */}
-        <HeroClinicalInstrument />
+        {/* Cinematic Biosensor Validation Visual Signpost */}
+        <HeroVisualSignpost />
       </section>
 
       {/* =====================================================================
