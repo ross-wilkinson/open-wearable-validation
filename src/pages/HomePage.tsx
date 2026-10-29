@@ -1,879 +1,215 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight,
   Check,
   Copy,
-  Cpu,
   ExternalLink,
-  Layers,
-  ShieldCheck,
-  Sliders,
   Sparkles,
   Terminal,
 } from 'lucide-react';
-import { OpenWearableValidationLogo } from '../components/brand/OpenWearableValidationLogo.tsx';
 import { AgreekitLogo } from '../components/brand/AgreekitLogo.tsx';
 
+const HERO_EDGE_FADE_MASK: React.CSSProperties = {
+  maskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
+  WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%)',
+};
+
+/**
+ * Directional Panoramic Underlay Masks:
+ * Fades the left edge where the graphic overlaps behind left-aligned copy,
+ * or fades the right edge where the graphic overlaps behind right-aligned copy.
+ */
+const UNDERLAY_RIGHT_MASK: React.CSSProperties = {
+  maskImage:
+    'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, black 34%, black 88%, transparent 100%)',
+  WebkitMaskImage:
+    'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.35) 18%, black 34%, black 88%, transparent 100%)',
+};
+
+const UNDERLAY_LEFT_MASK: React.CSSProperties = {
+  maskImage:
+    'linear-gradient(to left, transparent 0%, rgba(0,0,0,0.35) 18%, black 34%, black 88%, transparent 100%)',
+  WebkitMaskImage:
+    'linear-gradient(to left, transparent 0%, rgba(0,0,0,0.35) 18%, black 34%, black 88%, transparent 100%)',
+};
+
 /* ============================================================================
- * 1. HERO VISUAL SIGNPOST
- *    Cinematic software art & illuminated biosensor validation signpost
+ * 1. BORDERLESS CINEMATIC HERO VISUAL: RAW GLOWING PPG & ECG TRACES
  * ============================================================================ */
 function HeroVisualSignpost() {
   const uid = useId().replace(/:/g, '');
-  const ppgGlowId = `hero-ppg-glow-${uid}`;
-  const ecgGlowId = `hero-ecg-glow-${uid}`;
-  const corridorGradId = `hero-loa-grad-${uid}`;
+  const ppgGlowId = `ppg-glow-${uid}`;
+  const ecgGlowId = `ecg-glow-${uid}`;
+  const peakGlowId = `peak-glow-${uid}`;
+  const ppgAreaId = `ppg-area-${uid}`;
+
+  const ecgPeaks = [150, 320, 490, 660, 830];
+  const ppgPeaks = [188, 358, 528, 698, 868];
+
+  const ppgPathSegments: string[] = [
+    'M 0 100 C 12 100, 18 28, 28 28 C 39 28, 46 63, 54 64 C 61 65, 66 63, 74 68 C 96 80, 132 100, 158 100',
+  ];
+  for (let i = 0; i < ppgPeaks.length; i++) {
+    const p = ppgPeaks[i]!;
+    const nextFoot = i < ppgPeaks.length - 1 ? ecgPeaks[i + 1]! + 8 : 960;
+    if (i < ppgPeaks.length - 1) {
+      ppgPathSegments.push(
+        `C ${p - 20} 100, ${p - 12} 28, ${p} 28`,
+        `C ${p + 11} 28, ${p + 18} 63, ${p + 26} 64`,
+        `C ${p + 33} 65, ${p + 38} 63, ${p + 46} 68`,
+        `C ${p + 68} 80, ${nextFoot - 28} 100, ${nextFoot} 100`,
+      );
+    } else {
+      ppgPathSegments.push(
+        `C ${p - 20} 100, ${p - 12} 28, ${p} 28`,
+        `C ${p + 11} 28, ${p + 18} 63, ${p + 26} 64`,
+        `C ${p + 40} 66, ${p + 65} 92, 960 98`,
+      );
+    }
+  }
+  const ppgWavePath = ppgPathSegments.join(' ');
+  const ppgAreaPath = `${ppgWavePath} L 960 108 L 0 108 Z`;
+
+  const ecgPathSegments: string[] = [
+    'M 0 180 L 14 180 C 20 180, 26 154, 35 154 C 44 154, 48 180, 56 180',
+  ];
+  for (const r of ecgPeaks) {
+    ecgPathSegments.push(
+      `L ${r - 38} 180`,
+      `C ${r - 33} 180, ${r - 31} 169, ${r - 26} 169`,
+      `C ${r - 21} 169, ${r - 19} 180, ${r - 14} 180`,
+      `L ${r - 7} 180`,
+      `L ${r - 3.5} 188`,
+      `L ${r} 118`,
+      `L ${r + 5} 200`,
+      `L ${r + 11} 180`,
+      `C ${r + 19} 180, ${r + 25} 154, ${r + 34} 154`,
+      `C ${r + 43} 154, ${r + 47} 180, ${r + 55} 180`,
+    );
+  }
+  ecgPathSegments.push('L 960 180');
+  const ecgWavePath = ecgPathSegments.join(' ');
 
   return (
-    <div className="relative mx-auto w-full max-w-5xl">
-      {/* 1. Ambient Background Halo */}
+    <div className="relative mx-auto w-full max-w-5xl select-none">
       <div
-        className="pointer-events-none absolute -inset-x-8 -top-12 h-80 rounded-full bg-gradient-to-r from-sky-500/15 via-cyan-500/12 to-emerald-500/15 blur-3xl opacity-75"
+        className="pointer-events-none absolute inset-x-12 top-2 h-40 rounded-full bg-gradient-to-r from-sky-500/10 via-cyan-500/8 to-emerald-500/10 blur-3xl"
         aria-hidden="true"
       />
 
-      {/* 2. Main Hardware-Grade Glass Instrument Enclosure */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-[#090d16] text-slate-100 shadow-2xl">
-        {/* Top Studio Signpost Navigation Tabs */}
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 bg-[#060911]/90 px-4 py-2.5 sm:px-6">
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-0.5 no-scrollbar">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 text-[11px] font-mono font-bold text-sky-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-              01 Signal &amp; LoA Evaluation
-            </span>
-            <Link
-              to="/protocol-studio"
-              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              02 Protocol &amp; Sample Size
-            </Link>
-            <Link
-              to="/report-studio/overview"
-              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              03 Launch Gate Scorecards
-            </Link>
-            <Link
-              to="/reference-device-catalog"
-              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors hidden md:inline-flex"
-            >
-              04 Reference &amp; Baselines
-            </Link>
-          </div>
+      <svg
+        viewBox="0 0 960 212"
+        style={HERO_EDGE_FADE_MASK}
+        className="relative w-full h-auto overflow-visible"
+        role="img"
+        aria-label="Stacked physiological waveform comparison showing Optical PPG systolic peaks delayed relative to 3-Lead ECG R-peaks"
+      >
+        <defs>
+          <filter id={ppgGlowId} x="-10%" y="-20%" width="120%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id={ecgGlowId} x="-10%" y="-20%" width="120%" height="140%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id={peakGlowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <linearGradient id={ppgAreaId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.14" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
 
-          <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-slate-400">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span>CALIBRATED STREAM</span>
-          </div>
-        </div>
+        <path d={ppgAreaPath} fill={`url(#${ppgAreaId})`} />
+        <path
+          d={ppgWavePath}
+          fill="none"
+          stroke="#38bdf8"
+          strokeWidth="2.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter={`url(#${ppgGlowId})`}
+        />
 
-        {/* Sub-header: Live Paired Stream Specifications */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/60 bg-[#070b14]/60 px-5 py-2.5 text-xs font-mono text-slate-400">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              LIVE PAIRED SENSOR COMPARATOR
-            </span>
-            <span className="rounded bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400 border border-slate-700/60">
-              500 HZ SYNC
-            </span>
-            <span className="text-slate-400 hidden sm:inline">
-              Test: <strong className="text-sky-400 font-semibold">Wrist Optical PPG</strong>
-            </span>
-            <span className="text-slate-400 hidden sm:inline">
-              Ref: <strong className="text-emerald-400 font-semibold">3-Lead ECG Holter</strong>
-            </span>
-          </div>
+        <path
+          d={ecgWavePath}
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter={`url(#${ecgGlowId})`}
+        />
 
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400 border border-slate-700/40">
-              Regime: Resting Baseline
-            </span>
-            <Link
-              to="/academy"
-              className="text-sky-400 hover:text-sky-300 transition-colors text-[11px] font-semibold flex items-center gap-1"
-            >
-              <span>Explore Studios</span>
-              <ArrowRight size={11} />
-            </Link>
-          </div>
-        </div>
+        {ppgPeaks.map((px) => (
+          <g key={`ppg-dot-${px}`} filter={`url(#${peakGlowId})`}>
+            <circle cx={px} cy={28} r="7" fill="#f43f5e" fillOpacity="0.28" />
+            <circle cx={px} cy={28} r="4.25" fill="#f43f5e" stroke="#fecdd3" strokeWidth="1.2" />
+          </g>
+        ))}
 
-        {/* The Oscilloscope + Limits of Agreement Display Canvas */}
-        <div className="relative p-5 sm:p-7 select-none">
-          <svg
-            viewBox="0 0 900 200"
-            className="w-full h-auto max-h-56 overflow-visible"
-            aria-hidden="true"
-          >
-            <defs>
-              <filter id={ppgGlowId} x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-              <filter id={ecgGlowId} x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="2.5" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-              <linearGradient id={corridorGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.12" />
-                <stop offset="50%" stopColor="#10b981" stopOpacity="0.04" />
-                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.12" />
-              </linearGradient>
-            </defs>
-
-            {/* Shaded Agreement Corridor (95% Limits of Agreement Envelope) */}
-            <rect x="0" y="45" width="900" height="110" fill={`url(#${corridorGradId})`} />
-
-            {/* Sub-pixel Grid Lines */}
-            <line x1="0" y1="45" x2="900" y2="45" stroke="#1e293b" strokeDasharray="3 3" />
-            <line x1="0" y1="75" x2="900" y2="75" stroke="#1e293b" strokeDasharray="2 4" strokeOpacity="0.6" />
-            <line x1="0" y1="100" x2="900" y2="100" stroke="#334155" strokeWidth="1" strokeDasharray="6 3" />
-            <line x1="0" y1="125" x2="900" y2="125" stroke="#1e293b" strokeDasharray="2 4" strokeOpacity="0.6" />
-            <line x1="0" y1="155" x2="900" y2="155" stroke="#1e293b" strokeDasharray="3 3" />
-
-            {/* Vertical Epoch Time-Sync Ticks (Every 150px) */}
-            {[150, 300, 450, 600, 750].map((x) => (
-              <g key={x}>
-                <line x1={x} y1="30" x2={x} y2="170" stroke="#1e293b" strokeDasharray="3 3" />
-                <text x={x} y="185" fill="#475569" fontSize="9" fontFamily="monospace" textAnchor="middle">
-                  t+{(x / 150).toFixed(1)}s
-                </text>
-              </g>
-            ))}
-
-            {/* LoA Corridor Boundary Lines */}
-            <line x1="0" y1="45" x2="900" y2="45" stroke="#10b981" strokeWidth="1" strokeDasharray="4 2" strokeOpacity="0.8" />
-            <text x="890" y="41" fill="#10b981" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
-              +1.96 SD (+4.5 bpm)
-            </text>
-
-            <line x1="0" y1="100" x2="900" y2="100" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.9" />
-            <text x="890" y="96" fill="#38bdf8" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
-              Mean Bias (+0.34 bpm)
-            </text>
-
-            <line x1="0" y1="155" x2="900" y2="155" stroke="#10b981" strokeWidth="1" strokeDasharray="4 2" strokeOpacity="0.8" />
-            <text x="890" y="167" fill="#10b981" fontSize="9.5" fontFamily="monospace" textAnchor="end" fontWeight="bold">
-              -1.96 SD (-3.8 bpm)
-            </text>
-
-            {/* Optical Wrist PPG Waveform (Smooth Cyan Arterial Pressure Wave) */}
-            <path
-              d="
-                M 0 102
-                C 30 102, 60 55, 90 55 C 110 55, 125 78, 140 73 C 155 68, 180 102, 210 102
-                C 240 102, 270 55, 300 55 C 320 55, 335 78, 350 73 C 365 68, 390 102, 420 102
-                C 450 102, 480 55, 510 55 C 530 55, 545 78, 560 73 C 575 68, 600 102, 630 102
-                C 660 102, 690 55, 720 55 C 740 55, 755 78, 770 73 C 785 68, 810 102, 840 102
-                C 860 102, 885 70, 900 65
-              "
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              filter={`url(#${ppgGlowId})`}
-            />
-
-            {/* 3-Lead ECG Reference Waveform (Crisp Emerald QRS Complex) */}
-            <path
-              d="
-                M 0 100 L 55 100 L 64 96 L 72 100 L 80 100 L 84 112 L 90 28 L 96 122 L 102 100 L 114 100 L 124 92 L 134 100
-                L 265 100 L 274 96 L 282 100 L 290 100 L 294 112 L 300 28 L 306 122 L 312 100 L 324 100 L 334 92 L 344 100
-                L 475 100 L 484 96 L 492 100 L 500 100 L 504 112 L 510 28 L 516 122 L 522 100 L 534 100 L 544 92 L 554 100
-                L 685 100 L 694 96 L 702 100 L 710 100 L 714 112 L 720 28 L 726 122 L 732 100 L 744 100 L 754 92 L 764 100
-                L 895 100 L 900 100
-              "
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              filter={`url(#${ecgGlowId})`}
-            />
-
-            {/* Peak Synchronization Alignment Pins */}
-            {[90, 300, 510, 720].map((x) => (
-              <g key={x}>
-                <circle cx={x} cy="28" r="3.5" fill="#10b981" stroke="#060911" strokeWidth="1" />
-                <circle cx={x} cy="55" r="3.5" fill="#38bdf8" stroke="#060911" strokeWidth="1" />
-                <line x1={x} y1="28" x2={x} y2="55" stroke="#38bdf8" strokeWidth="1" strokeDasharray="2 2" strokeOpacity="0.7" />
-              </g>
-            ))}
-          </svg>
-        </div>
-
-        {/* Bottom Hardware Telemetry Readout Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-slate-800/80 bg-[#060911]/90 px-5 py-3.5 sm:px-6">
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-              Mean Bias (d&#772;)
-            </div>
-            <div className="text-sm sm:text-base font-mono font-bold text-emerald-400">
-              +0.34 bpm
-            </div>
-          </div>
-
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-              95% Limits of Agreement
-            </div>
-            <div className="text-sm sm:text-base font-mono font-bold text-slate-200">
-              [-3.8, +4.5] bpm
-            </div>
-          </div>
-
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-              Statistical Model
-            </div>
-            <div className="text-xs sm:text-sm font-mono font-semibold text-sky-400">
-              Repeated-Measures ANOVA
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-center">
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5">
-              Clinical Gate Verdict
-            </div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-mono font-bold text-emerald-400 w-fit">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>PASS &bull; FDA 510(k) READY</span>
-            </div>
-          </div>
-        </div>
-      </div>
+        {ecgPeaks.map((rx) => (
+          <g key={`ecg-dot-${rx}`} filter={`url(#${peakGlowId})`}>
+            <circle cx={rx} cy={118} r="7" fill="#f43f5e" fillOpacity="0.28" />
+            <circle cx={rx} cy={118} r="4.25" fill="#f43f5e" stroke="#fecdd3" strokeWidth="1.2" />
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
 
 /* ============================================================================
- * 2. WORKBENCH CARD 1: PROTOCOL STUDIO
- *    Interactive cohort slider running Greenwood precision equation
- * ============================================================================ */
-function ProtocolStudioCard() {
-  const [sampleN, setSampleN] = useState(42);
-  const uid = useId().replace(/:/g, '');
-  const curveGradId = `protocol-curve-${uid}`;
-
-  // Greenwood LoA confidence margin width: w = 1.96 * sqrt(3 * s^2 / N)
-  // For physiological heart rate std dev s = 2.5 bpm
-  const marginWidth = (1.96 * Math.sqrt((3 * 6.25) / sampleN)).toFixed(1);
-
-  const minN = 15;
-  const maxN = 120;
-  const ratio = (sampleN - minN) / (maxN - minN);
-  const markerX = 24 + ratio * 552;
-  const markerY = 28 + 108 * (1 - Math.pow(ratio, 0.48));
-
-  // Precision curve coordinates
-  const curvePoints: string[] = [];
-  const upperBandPoints: string[] = [];
-  const lowerBandPoints: string[] = [];
-  for (let i = 0; i <= 40; i++) {
-    const t = i / 40;
-    const x = 24 + t * 552;
-    const y = 28 + 108 * (1 - Math.pow(t, 0.48));
-    const spread = 18 * (1 - 0.65 * t);
-    curvePoints.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`);
-    upperBandPoints.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${(y - spread).toFixed(1)}`);
-    lowerBandPoints.unshift(`L ${x.toFixed(1)} ${(y + spread).toFixed(1)}`);
-  }
-  const areaPath = `${upperBandPoints.join(' ')} ${lowerBandPoints.join(' ')} Z`;
-  const linePath = curvePoints.join(' ');
-
-  return (
-    <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm transition-colors hover:border-ink/25">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-400">
-            PROTOCOL STUDIO
-          </span>
-          <span className="rounded-full bg-emerald-500/10 border border-emerald-500/25 px-3 py-0.5 font-mono text-xs font-bold text-emerald-400">
-            LoA Precision Margin: &plusmn;{marginWidth} bpm
-          </span>
-        </div>
-
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-          <Link to="/protocol-studio" className="hover:underline focus:outline-hidden">
-            Design your validation study
-          </Link>
-        </h2>
-        <p className="text-sm text-ink-secondary max-w-2xl">
-          Sizing a study too small risks inconclusive results, while sizing it too large wastes time and budget. Design protocols for internal product KPIs, predecessor comparisons, or regulatory submissions that properly account for measurement agreement, repeated measures, and demographic quotas before enrolling participants.
-        </p>
-      </div>
-
-      {/* Edge-to-Edge Responsive Precision Canvas */}
-      <div className="my-6 rounded-xl border border-slate-800/90 bg-[#090d16] p-5 text-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <label
-            htmlFor="protocol-n-slider"
-            className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-slate-300 cursor-pointer"
-          >
-            <Sliders size={13} className="text-sky-400" />
-            <span>Simulate Participant Cohort (N):</span>
-          </label>
-          <div className="flex items-center gap-3 font-mono text-xs">
-            <span className="rounded bg-sky-500/20 border border-sky-500/40 px-2.5 py-0.5 font-bold text-sky-300">
-              N = {sampleN} subjects
-            </span>
-            <span className="text-slate-400 hidden sm:inline">Non-Central t Exact Inversion</span>
-          </div>
-        </div>
-
-        {/* Range Slider aligned with SVG coordinates */}
-        <div className="px-2">
-          <input
-            id="protocol-n-slider"
-            type="range"
-            min={minN}
-            max={maxN}
-            value={sampleN}
-            onChange={(e) => setSampleN(Number(e.target.value))}
-            className="w-full accent-sky-400 cursor-pointer h-2 rounded-lg bg-slate-800"
-          />
-        </div>
-
-        <svg viewBox="0 0 600 165" className="w-full h-auto select-none mt-2 overflow-visible" aria-hidden="true">
-          <defs>
-            <linearGradient id={curveGradId} x1="0" y1="0" x2="0" y2="1">
-              <stop stopColor="#38bdf8" stopOpacity="0.28" />
-              <stop offset="1" stopColor="#38bdf8" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
-          {/* Reference Gridlines */}
-          <line x1="24" y1="35" x2="576" y2="35" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="24" y1="85" x2="576" y2="85" stroke="#1e293b" strokeDasharray="4 4" />
-          <line x1="24" y1="138" x2="576" y2="138" stroke="#334155" />
-
-          {/* Clinical Tolerance Threshold */}
-          <line x1="24" y1="96" x2="576" y2="96" stroke="#10b981" strokeWidth="1" strokeDasharray="6 4" strokeOpacity="0.6" />
-          <text x="572" y="90" fill="#10b981" fontSize="11" fontFamily="monospace" textAnchor="end">
-            Clinical Target Corridor (&plusmn;2.5 bpm)
-          </text>
-
-          {/* Precision Envelope & Curve */}
-          <path d={areaPath} fill={`url(#${curveGradId})`} />
-          <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
-
-          {/* 1:1 Synchronized Caliper Line */}
-          <line
-            x1={markerX}
-            y1="12"
-            x2={markerX}
-            y2="138"
-            stroke="#f59e0b"
-            strokeWidth="1.75"
-            strokeDasharray="3 3"
-          />
-          <circle cx={markerX} cy={markerY} r="6" fill="#f59e0b" stroke="#090d16" strokeWidth="2.5" />
-
-          {/* Caliper Callout */}
-          <g transform={`translate(${Math.max(70, Math.min(530, markerX))}, ${Math.max(26, markerY - 22)})`}>
-            <rect x="-62" y="-16" width="124" height="22" rx="5" fill="#0f172a" stroke="#f59e0b" strokeWidth="1.2" />
-            <text x="0" y="-1" fill="#fde68a" fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-              N={sampleN} &bull; &plusmn;{marginWidth} bpm
-            </text>
-          </g>
-
-          <text x="24" y="156" fill="#64748b" fontSize="11" fontFamily="monospace">
-            N = 15 (Underpowered)
-          </text>
-          <text x="300" y="156" fill="#64748b" fontSize="11" fontFamily="monospace" textAnchor="middle">
-            N = 42 (FDA Standard)
-          </text>
-          <text x="576" y="156" fill="#64748b" fontSize="11" fontFamily="monospace" textAnchor="end">
-            N = 120 (High Precision)
-          </text>
-        </svg>
-      </div>
-
-      <div className="flex items-center justify-between border-t border-hairline pt-4">
-        <span className="text-xs font-mono text-ink-muted">
-          Greenwood Variance &bull; Repeated-Measures ANOVA &bull; Monk Skin Tone Quotas
-        </span>
-        <Link
-          to="/protocol-studio"
-          className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-surface transition-all hover:opacity-90 shrink-0"
-        >
-          <span>Enter Protocol Studio</span>
-          <ArrowRight size={14} />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-/* ============================================================================
- * 3. WORKBENCH CARD 2: REPORT STUDIO
- *    Tactile DOM 2x2 Launch Gate Scorecard
- * ============================================================================ */
-function ReportStudioCard() {
-  const [candidate, setCandidate] = useState<'v1' | 'v2.4'>('v2.4');
-
-  return (
-    <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm transition-colors hover:border-ink/25">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-400">
-            REPORT STUDIO
-          </span>
-
-          <div className="inline-flex rounded-lg border border-hairline bg-plane p-0.5 text-xs font-mono font-semibold">
-            <button
-              type="button"
-              onClick={() => setCandidate('v1')}
-              className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
-                candidate === 'v1'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              V1 Predecessor
-            </button>
-            <button
-              type="button"
-              onClick={() => setCandidate('v2.4')}
-              className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
-                candidate === 'v2.4'
-                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-xs'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              V2.4 Candidate
-            </button>
-          </div>
-        </div>
-
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-          <Link to="/report-studio/overview" className="hover:underline focus:outline-hidden">
-            Evaluate product launch readiness
-          </Link>
-        </h2>
-        <p className="text-sm text-ink-secondary">
-          Discover the right metrics and KPI frameworks to evaluate wearable performance, and synthesize your results into clear decision scorecards that your stakeholders can all understand and trust.
-        </p>
-      </div>
-
-      {/* Tactile 2x2 Decision Matrix in DOM */}
-      <div className="my-6 rounded-xl border border-slate-800/90 bg-[#090d16] p-4 text-white">
-        <div className="grid grid-cols-2 gap-2.5 relative">
-          {/* Quadrant II: Top-Left */}
-          <div
-            className={`rounded-lg border p-3.5 transition-all ${
-              candidate === 'v1'
-                ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/5'
-                : 'border-slate-800 bg-slate-900/40 opacity-60'
-            }`}
-          >
-            <div className="flex items-center justify-between text-[11px] font-mono">
-              <span className="font-bold text-amber-400">Q II &bull; PARITY RISK</span>
-              {candidate === 'v1' && (
-                <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
-                  ACTIVE
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-slate-300 font-medium">
-              Meets absolute bound, underpowered vs. predecessor
-            </p>
-            {candidate === 'v1' && (
-              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-300">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-                V1 Firmware: &sigma; = 4.9 bpm
-              </div>
-            )}
-          </div>
-
-          {/* Quadrant I: Top-Right (Green Light) */}
-          <div
-            className={`rounded-lg border p-3.5 transition-all ${
-              candidate === 'v2.4'
-                ? 'border-emerald-500/60 bg-emerald-500/15 shadow-lg shadow-emerald-500/5'
-                : 'border-slate-800 bg-slate-900/40 opacity-60'
-            }`}
-          >
-            <div className="flex items-center justify-between text-[11px] font-mono">
-              <span className="font-bold text-emerald-400">Q I &bull; GREEN LIGHT</span>
-              {candidate === 'v2.4' && (
-                <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                  PASS
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-slate-300 font-medium">
-              Superior to predicate &amp; inside clinical LoA corridor
-            </p>
-            {candidate === 'v2.4' && (
-              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                V2.4 Candidate: 98.4% CI
-              </div>
-            )}
-          </div>
-
-          {/* Quadrant III: Bottom-Left */}
-          <div className="rounded-lg border border-slate-800/80 bg-slate-900/30 p-3 opacity-55">
-            <div className="text-[11px] font-mono font-bold text-rose-400">Q III &bull; REJECT GATE</div>
-            <p className="mt-1 text-xs text-slate-400">
-              Exceeds clinical error bounds &amp; degrades lineage
-            </p>
-          </div>
-
-          {/* Quadrant IV: Bottom-Right */}
-          <div className="rounded-lg border border-slate-800/80 bg-slate-900/30 p-3 opacity-55">
-            <div className="text-[11px] font-mono font-bold text-amber-400/80">Q IV &bull; QUALITY DEBT</div>
-            <p className="mt-1 text-xs text-slate-400">
-              Beats legacy baseline but fails clinical spec
-            </p>
-          </div>
-        </div>
-
-        {/* Clear Verdict Readout Bar */}
-        <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-3 font-mono text-xs">
-          <span className="text-slate-400">Gate Decision:</span>
-          {candidate === 'v2.4' ? (
-            <span className="font-bold text-emerald-400">
-              SHIP CANDIDATE V2.4 (98.4% Bivariate Confidence)
-            </span>
-          ) : (
-            <span className="font-bold text-amber-400">
-              HOLD V1 RELEASE (Parity Risk in High-Motion Stratum)
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between border-t border-hairline pt-4">
-        <span className="text-xs font-mono text-ink-muted">
-          2x2 Equivalence Gate &bull; Subgroup Audits &bull; Automated Decision Scorecards
-        </span>
-        <Link
-          to="/report-studio/overview"
-          className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-surface transition-all hover:opacity-90 shrink-0"
-        >
-          <span>Enter Report Studio</span>
-          <ArrowRight size={14} />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-/* ============================================================================
- * 4. WORKBENCH CARD 3: PITFALL EXPLORER
- * ============================================================================ */
-function PitfallExplorerCard() {
-  const [mode, setMode] = useState<'trap' | 'loa'>('loa');
-
-  return (
-    <article className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 shadow-sm">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Left 5 Columns: Narrative & Mode Switcher */}
-        <div className="lg:col-span-5 space-y-4">
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-rose-400">
-            PITFALL EXPLORER
-          </span>
-
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-            <Link to="/explainers" className="hover:underline focus:outline-hidden">
-              Avoid costly statistical pitfalls
-            </Link>
-          </h2>
-
-          <p className="text-sm text-ink-secondary leading-relaxed">
-            Standard statistical software was built to detect differences between groups rather than evaluate agreement, while generic AI assistants frequently fall into common statistical traps. Discover why standard methods fail when applied to paired wearable sensors, repeated measures, and rapid prototyping screens.
-          </p>
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setMode('trap')}
-              className={`rounded-xl px-3.5 py-2 font-mono text-xs font-bold transition-all cursor-pointer border ${
-                mode === 'trap'
-                  ? 'bg-rose-500/15 border-rose-500/50 text-rose-400'
-                  : 'bg-plane border-hairline text-ink-secondary hover:text-ink'
-              }`}
-            >
-              Trap #1: Pearson r = 0.96 Illusion
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('loa')}
-              className={`rounded-xl px-3.5 py-2 font-mono text-xs font-bold transition-all cursor-pointer border ${
-                mode === 'loa'
-                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
-                  : 'bg-plane border-hairline text-ink-secondary hover:text-ink'
-              }`}
-            >
-              Solution: Repeated-Measures LoA
-            </button>
-          </div>
-
-          <div className="pt-2">
-            <Link
-              to="/explainers"
-              className="inline-flex items-center gap-2 text-xs font-bold text-ink hover:text-sky-400 transition-colors"
-            >
-              <span>Enter Pitfall Explorer</span>
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-        </div>
-
-        {/* Right 7 Columns: Side-by-Side Proof */}
-        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-slate-800/90 bg-[#090d16] p-4 text-white">
-          {/* Panel A: The Naive Correlation Trap */}
-          <div
-            className={`rounded-lg border p-4 transition-all ${
-              mode === 'trap'
-                ? 'border-rose-500/60 bg-rose-950/20'
-                : 'border-slate-800 bg-slate-900/40 opacity-75'
-            }`}
-          >
-            <div className="flex items-center justify-between font-mono text-xs mb-2">
-              <span className="font-bold text-rose-400">THE CORRELATION TRAP</span>
-              <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                r = 0.96 (p &lt; 0.001)
-              </span>
-            </div>
-            <svg viewBox="0 0 240 110" className="w-full h-auto select-none my-2" aria-hidden="true">
-              <line x1="20" y1="95" x2="220" y2="95" stroke="#334155" />
-              <line x1="20" y1="15" x2="20" y2="95" stroke="#334155" />
-              <line x1="25" y1="90" x2="210" y2="25" stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
-              <line x1="25" y1="78" x2="210" y2="12" stroke="#f43f5e" strokeWidth="2" />
-              <circle cx="45" cy="71" r="3.5" fill="#f43f5e" />
-              <circle cx="80" cy="58" r="3.5" fill="#f43f5e" />
-              <circle cx="115" cy="46" r="3.5" fill="#f43f5e" />
-              <circle cx="155" cy="31" r="3.5" fill="#f43f5e" />
-              <circle cx="195" cy="18" r="3.5" fill="#f43f5e" />
-            </svg>
-            <p className="text-xs text-slate-300 font-mono">
-              Conceals a <strong className="text-rose-400">+8.4 bpm systematic bias</strong> despite near-perfect correlation.
-            </p>
-          </div>
-
-          {/* Panel B: True Limits of Agreement */}
-          <div
-            className={`rounded-lg border p-4 transition-all ${
-              mode === 'loa'
-                ? 'border-emerald-500/60 bg-emerald-950/20'
-                : 'border-slate-800 bg-slate-900/40 opacity-75'
-            }`}
-          >
-            <div className="flex items-center justify-between font-mono text-xs mb-2">
-              <span className="font-bold text-emerald-400">TRUE AGREEMENT CORRIDOR</span>
-              <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                &plusmn;1.96 SD Corridor
-              </span>
-            </div>
-            <svg viewBox="0 0 240 110" className="w-full h-auto select-none my-2" aria-hidden="true">
-              <rect x="20" y="28" width="200" height="54" fill="#10b981" fillOpacity="0.1" />
-              <line x1="20" y1="28" x2="220" y2="28" stroke="#10b981" strokeWidth="1.5" />
-              <line x1="20" y1="55" x2="220" y2="55" stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 3" />
-              <line x1="20" y1="82" x2="220" y2="82" stroke="#10b981" strokeWidth="1.5" />
-              <circle cx="45" cy="51" r="3.5" fill="#10b981" />
-              <circle cx="80" cy="62" r="3.5" fill="#10b981" />
-              <circle cx="115" cy="48" r="3.5" fill="#10b981" />
-              <circle cx="155" cy="59" r="3.5" fill="#10b981" />
-              <circle cx="195" cy="53" r="3.5" fill="#10b981" />
-            </svg>
-            <p className="text-xs text-slate-300 font-mono">
-              Exposes exact mean bias and <strong className="text-emerald-400">true Limits of Agreement</strong> across subjects.
-            </p>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/* ============================================================================
- * 5. THE VALIDATION ACADEMY: MERIDIAN PULSEBAND 2 (Learning Studio)
- * ============================================================================ */
-function ValidationAcademyShowcase() {
-  const [activeStep, setActiveStep] = useState(1);
-
-  const modules = [
-    {
-      step: 1,
-      phase: 'Prototyping',
-      title: 'Optical Bench & SNR Baseline',
-      desc: 'Evaluate raw green/red/IR PPG perfusion indices against benchtop phantoms before human trials.',
-      metric: 'SNR Gate: > 18 dB',
-    },
-    {
-      step: 2,
-      phase: 'Study Sizing',
-      title: 'Greenwood LoA Sample Sizing',
-      desc: 'Size the Meridian PulseBand 2 cohort so outer 95% confidence bounds fit strictly inside ±5.0 bpm.',
-      metric: 'Cohort: N = 48',
-    },
-    {
-      step: 3,
-      phase: 'Provocation',
-      title: 'Cadence Lock Treadmill Protocol',
-      desc: 'Stress-test optical heart rate tracking across step-frequency harmonics during incline running.',
-      metric: 'Harmonic Reject: 94%',
-    },
-    {
-      step: 4,
-      phase: 'Equity & Quotas',
-      title: 'Monk Skin Tone Stratification',
-      desc: 'Balance participant recruitment across all 10 Monk Skin Tone levels to prevent melanin absorption bias.',
-      metric: 'MST 8–10 Quota: ≥ 35%',
-    },
-    {
-      step: 5,
-      phase: 'Motion Compensation',
-      title: 'Accelerometer Sensor Fusion',
-      desc: 'Validate adaptive noise cancellation algorithms under high-G wrist kinematics.',
-      metric: 'Motion RMSE: 2.1 bpm',
-    },
-    {
-      step: 6,
-      phase: 'Regulatory',
-      title: 'FDA 510(k) Predicate Alignment',
-      desc: 'Pair test data against clinical 3-lead ECG and arterial blood gas CO-oximetry predicates.',
-      metric: 'ISO 80601-2-61',
-    },
-    {
-      step: 7,
-      phase: 'Launch Gate',
-      title: 'Bivariate 2x2 Release Scorecard',
-      desc: 'Synthesize subgroup performance into an executive Go/No-Go firmware release decision.',
-      metric: 'Verdict: Q1 PASS',
-    },
-    {
-      step: 8,
-      phase: 'Post-Market',
-      title: 'Multi-Year Algorithmic Drift Audit',
-      desc: 'Monitor longitudinal firmware updates against locked reference datasets to prevent regression.',
-      metric: 'Drift: < 0.2 bpm/yr',
-    },
-  ];
-
-  const currentMod = (modules[activeStep - 1] ?? modules[0])!;
-
-  return (
-    <section
-      aria-label="The Validation Academy Guided Curriculum"
-      className="relative overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-[#0f172a] via-[#090d16] to-[#0c1324] p-6 sm:p-10 text-white shadow-xl"
-    >
-      <div
-        className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-500/15 blur-3xl"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-slate-800 pb-6">
-        <div className="space-y-2 max-w-2xl">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-400">
-              LEARNING STUDIO
-            </span>
-            <span className="text-slate-600">&bull;</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 px-3 py-0.5 font-mono text-xs font-bold text-indigo-300">
-              <Sparkles size={12} />
-              <span>8-Stage Longitudinal Flight Path</span>
-            </span>
-          </div>
-
-          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-            The Validation Academy
-          </h2>
-
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-200">
-            <Link to="/academy" className="hover:underline focus:outline-hidden">
-              Learn wearable validation hands-on
-            </Link>
-          </h2>
-
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            Step into the shoes of a lead validation scientist developing the fictional Meridian PulseBand 2. Work through 8 interactive modules spanning the full product journey—from early prototyping and product launch to investigating post-launch issues and tracking multi-year device iterations.
-          </p>
-        </div>
-
-        <Link
-          to="/academy"
-          className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-xs sm:text-sm font-bold text-slate-950 shadow-md transition-all hover:bg-slate-100 self-start lg:self-auto shrink-0"
-        >
-          <span>Enter Validation Academy</span>
-          <ArrowRight size={15} />
-        </Link>
-      </div>
-
-      {/* 8-Module Step Selector */}
-      <div className="relative z-10 mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-        {modules.map((m) => {
-          const isSelected = m.step === activeStep;
-          return (
-            <button
-              key={m.step}
-              type="button"
-              onClick={() => setActiveStep(m.step)}
-              className={`flex flex-col items-start justify-between rounded-xl border p-3 text-left transition-all cursor-pointer ${
-                isSelected
-                  ? 'border-indigo-400 bg-indigo-500/20 text-white shadow-md'
-                  : 'border-slate-800/90 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <span className={`font-mono text-xs font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-500'}`}>
-                M0{m.step}
-              </span>
-              <span className="mt-1 text-xs font-semibold line-clamp-1">{m.phase}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active Module Detail */}
-      <div className="relative z-10 mt-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center rounded-2xl border border-slate-800 bg-[#060911]/90 p-5 sm:p-6">
-        <div className="lg:col-span-8 space-y-2">
-          <div className="flex items-center gap-3 font-mono text-xs">
-            <span className="text-indigo-400 font-bold uppercase">
-              Module 0{currentMod.step} // {currentMod.phase}
-            </span>
-            <span className="text-slate-600">&bull;</span>
-            <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-emerald-300 font-semibold">
-              {currentMod.metric}
-            </span>
-          </div>
-          <h3 className="text-xl sm:text-2xl font-bold text-white">{currentMod.title}</h3>
-          <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">{currentMod.desc}</p>
-        </div>
-
-        <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-end gap-2 border-t lg:border-t-0 lg:border-l border-slate-800 pt-4 lg:pt-0 lg:pl-6">
-          <div className="text-xs font-mono text-slate-400 lg:text-right">
-            Includes interactive sandbox, synthetic sensor dataset &amp; reference solution.
-          </div>
-          <Link
-            to="/academy"
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-400/40 bg-indigo-500/15 hover:bg-indigo-500/25 px-4 py-2 text-xs font-mono font-bold text-indigo-200 transition-colors"
-          >
-            <span>Launch Module 0{currentMod.step} Sandbox</span>
-            <ArrowRight size={13} />
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================================
- * 6. MAIN HOMEPAGE COMPONENT
+ * 2. MAIN HOMEPAGE COMPONENT
+ *    Sequential Full-Width Vertical Narrative with Panoramic Overlapping
+ *    Underlays, Equal 320px Vertical Cadence, and Matched Focal Backlighting.
  * ============================================================================ */
 export default function HomePage() {
   const [copiedPip, setCopiedPip] = useState(false);
-  const [replTab, setReplTab] = useState<'python' | 'cli'>('python');
+  const uid = useId().replace(/:/g, '');
+  const lineGradId = `academy-ring-${uid}`;
+  const areaGradId = `academy-core-${uid}`;
+  const curveGradId = `protocol-curve-${uid}`;
+  const trapGlowId = `trap-glow-${uid}`;
+  const distGlowId = `dist-glow-${uid}`;
+  const distGradId = `dist-grad-${uid}`;
+  const pulseKeyframesName = `report-pulse-${uid}`;
+  const labelFadeKeyframesName = `report-fade-${uid}`;
+
+  // 8-stage circular lifecycle coordinates around center (cx = 480, cy = 130, R = 88)
+  const cycleCx = 480;
+  const cycleCy = 130;
+  const cycleR = 88;
+  const labelR = 113;
+  const academyCircularNodes = Array.from({ length: 8 }, (_, i) => {
+    const angleDeg = -90 + i * 45;
+    const rad = (angleDeg * Math.PI) / 180;
+    return {
+      num: `0${i + 1}`,
+      x: Math.round((cycleCx + cycleR * Math.cos(rad)) * 10) / 10,
+      y: Math.round((cycleCy + cycleR * Math.sin(rad)) * 10) / 10,
+      lx: Math.round((cycleCx + labelR * Math.cos(rad)) * 10) / 10,
+      ly: Math.round((cycleCy + labelR * Math.sin(rad)) * 10) / 10 + 4,
+    };
+  });
+
+  // Scatter points tightly fitted to the biased regression line from (0, 210) to (760, 14):
+  // y_fit(x) = 210 - (196 / 760) * x, with small alternating +/- 4.5px residuals (r = 0.99)
+  const scatterPoints = [
+    { x: 80, y: 194 },
+    { x: 145, y: 168 },
+    { x: 210, y: 160 },
+    { x: 275, y: 134 },
+    { x: 340, y: 127 },
+    { x: 405, y: 101 },
+    { x: 470, y: 93 },
+    { x: 535, y: 67 },
+    { x: 600, y: 60 },
+    { x: 665, y: 34 },
+  ];
 
   function handleCopyPip() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -884,57 +220,43 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative flex flex-col gap-20 sm:gap-28 py-6 sm:py-12">
+    <div className="relative flex flex-col py-2 sm:py-4">
       {/* =====================================================================
-          STAGE 1: ARCHITECTURAL HERO
+          HERO: BORDERLESS INFINITE FADING SVG HERO
           ===================================================================== */}
-      <section className="space-y-10">
-        <div className="mx-auto max-w-4xl text-center space-y-6">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold text-emerald-400 shadow-2xs backdrop-blur-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="tracking-wide uppercase font-mono text-[11px]">
-              Open Wearable Validation Studio
-            </span>
-            <span className="text-emerald-500/40">&bull;</span>
-            <span className="text-emerald-300/80 font-normal">
-              100% Local Browser Execution
-            </span>
-          </div>
-
+      <section className="space-y-4 border-b border-hairline dark:border-[#27272a] pb-12 sm:pb-14">
+        <div className="mx-auto max-w-4xl text-center space-y-4">
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-ink leading-[1.05] max-w-4xl mx-auto">
             Validate Wearable Sensors <br className="hidden sm:inline" />
-            <span className="bg-gradient-to-r from-sky-400 via-cyan-300 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(56,189,248,0.35)]">
-              &amp; Health Algorithms.
+            &amp;{' '}
+            <span className="bg-gradient-to-r from-sky-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+              Health Algorithms.
             </span>
           </h1>
 
-          <p className="mx-auto max-w-3xl text-base sm:text-lg lg:text-xl leading-relaxed text-ink-secondary font-normal">
-            The open-source suite for wearable sensors and health algorithms. Plan robust clinical protocols, calculate defensible sample sizes, evaluate performance against clinical reference standards, and make confident product launch decisions.
+          <p className="mx-auto max-w-3xl text-sm sm:text-base leading-relaxed text-ink-secondary">
+            Purpose-built tools for sensor engineers, researchers, and data scientists validating physiological algorithms and wearable biosensors. Plan robust protocols, calculate defensible sample sizes, evaluate performance against clinical reference standards, and make confident product launch decisions.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
-              to="/protocol-studio"
-              className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-sm font-bold text-surface shadow-sm transition-all hover:opacity-90"
+              to="/academy"
+              className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-surface shadow-sm transition-opacity hover:opacity-90"
             >
-              <span>Explore Validation Studios</span>
-              <ArrowRight size={16} />
+              <span>Explore The Academy &rarr;</span>
             </Link>
 
             <button
               type="button"
               onClick={handleCopyPip}
-              className="group inline-flex items-center gap-2.5 rounded-xl border border-hairline bg-surface px-4 py-3 font-mono text-xs sm:text-sm text-ink-secondary transition-all hover:border-ink/30 hover:bg-plane cursor-pointer"
+              className="group inline-flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#090d16] px-4 py-2.5 font-mono text-xs sm:text-sm text-zinc-300 transition-colors hover:border-zinc-600 cursor-pointer"
             >
               <Terminal size={14} className="text-amber-400 shrink-0" />
-              <span className="text-ink font-semibold">$ pip install agreekit</span>
+              <span className="text-white font-semibold">$ pip install agreekit</span>
               {copiedPip ? (
                 <Check size={14} className="text-emerald-400" />
               ) : (
-                <Copy size={14} className="text-ink-muted group-hover:text-ink transition-colors" />
+                <Copy size={14} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
               )}
             </button>
 
@@ -942,7 +264,7 @@ export default function HomePage() {
               href="https://github.com/ross-wilkinson/open-wearable-validation"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane/70 px-4 py-3 text-xs sm:text-sm font-semibold text-ink-secondary hover:text-ink hover:border-ink/25 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink-secondary hover:text-ink transition-colors"
             >
               <span>GitHub</span>
               <ExternalLink size={13} />
@@ -950,330 +272,787 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Cinematic Biosensor Validation Visual Signpost */}
         <HeroVisualSignpost />
       </section>
 
       {/* =====================================================================
-          STAGE 2: INTERACTIVE WORKBENCHES (In-Browser Studios)
+          ROW 01 (LEFT FOREGROUND COPY / RIGHT PANORAMIC UNDERLAY): ACADEMY
+          Theme Color: INDIGO (Toned-Down Focal Glow + Circular Lifecycle Timeline)
           ===================================================================== */}
-      <section aria-label="Interactive Validation Workbenches" className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-hairline pb-5">
-          <div className="space-y-1.5">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-400">
-              IN-BROWSER STATISTICAL WORKBENCHES
+      <Link
+        to="/academy"
+        aria-label="The Validation Academy Guided Curriculum"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-between border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Indigo Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 right-[8%] h-64 w-[520px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(99,102,241,0.22) 0%, rgba(129,140,248,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 lg:max-w-md space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">
+              LEARNING STUDIO
             </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-ink">
-              Interactive Validation Studios
-            </h2>
+            <span className="text-slate-400 dark:text-slate-600">&bull;</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 dark:bg-indigo-500/20 border border-indigo-400/30 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+              <Sparkles size={11} />
+              <span>8-Stage Flight Path</span>
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-ink-secondary max-w-md">
-            Interact with the live statistical engines below, or open each full studio workbench. Zero patient data ever leaves your browser.
+
+          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-ink transition-colors group-hover:text-indigo-500 dark:group-hover:text-indigo-400">
+            The Validation Academy: Learn wearable validation hands-on
+          </h2>
+
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Follow the fictional Meridian PulseBand 2 across an interactive 8-module validation journey from optical bench prototyping to product launch.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
-          <div className="lg:col-span-7 flex">
-            <ProtocolStudioCard />
-          </div>
-          <div className="lg:col-span-5 flex">
-            <ReportStudioCard />
-          </div>
-          <div className="lg:col-span-12">
-            <PitfallExplorerCard />
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================================
-          STAGE 3: THE VALIDATION ACADEMY
-          ===================================================================== */}
-      <ValidationAcademyShowcase />
-
-      {/* =====================================================================
-          STAGE 4: OPEN-SOURCE ECOSYSTEM & CLINICAL REFERENCE BASELINES
-          ===================================================================== */}
-      <section aria-label="Developer Engines and Reference Catalogs" className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-hairline pb-5">
-          <div className="space-y-1.5">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
-              PYTHON ENGINE &bull; NHANES DISTRIBUTIONS &bull; 510(K) PREDICATES
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-ink">
-              Code Pipelines &amp; Clinical Reference Standards
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-ink-secondary max-w-md">
-            Run reproducible validation pipelines in Python or ground your clinical protocol in normative population datasets and hardware comparator specs.
-          </p>
-        </div>
-
-        {/* 3-Column Responsive Grid matching test: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-          {/* Card 1: agreekit Python Engine */}
-          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold uppercase text-amber-400">
-                  <AgreekitLogo size={14} />
-                  <span>AGREEKIT</span>
-                </span>
-                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
-                  Python &bull; CLI &bull; MCP
-                </span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-ink">
-                <Link to="/agreekit" className="hover:underline focus:outline-hidden">
-                  Execute agreement analyses in Python
-                </Link>
-              </h2>
-              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-                An open-source Python package and MCP server built specifically for wearable health and algorithm validation studies. Execute exact agreement statistics, variance decompositions, and cluster-bootstrap confidence intervals directly within your own research pipelines and AI workflows.
-              </p>
-            </div>
-
-            <div className="my-5 rounded-xl border border-slate-800 bg-[#090d16] p-4 font-mono text-xs text-slate-200 space-y-3">
-              {/* Install Bar matching test: pip install agreekit */}
-              <div className="flex items-center justify-between rounded-lg bg-slate-900/90 px-2.5 py-1.5 border border-slate-800 text-[11px]">
-                <div className="flex items-center gap-1.5 text-slate-300">
-                  <Terminal size={12} className="text-amber-400 shrink-0" aria-hidden />
-                  <span className="text-amber-400 select-none">$</span>
-                  <span className="text-slate-100 font-semibold">pip install agreekit</span>
-                </div>
-                <span className="text-[10px] text-slate-500 font-sans">PyPI</span>
-              </div>
-
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setReplTab('python')}
-                    className={`rounded px-2 py-0.5 text-[11px] cursor-pointer ${
-                      replTab === 'python' ? 'bg-slate-800 text-sky-300 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Python API
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReplTab('cli')}
-                    className={`rounded px-2 py-0.5 text-[11px] cursor-pointer ${
-                      replTab === 'cli' ? 'bg-slate-800 text-amber-300 font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    CLI / MCP
-                  </button>
-                </div>
-              </div>
-
-              {replTab === 'python' ? (
-                <div className="space-y-1 text-[11px] leading-relaxed">
-                  <p>
-                    <span className="text-purple-400">import</span> agreekit <span className="text-purple-400">as</span> ak
-                  </p>
-                  <p>
-                    res = ak.<span className="text-sky-400">analyze</span>(ref=ecg, test=ppg, cluster=id)
-                  </p>
-                  <p className="text-emerald-400"># Repeated-measures limits-of-agreement &amp; CIs</p>
-                </div>
-              ) : (
-                <div className="space-y-1 text-[11px] leading-relaxed">
-                  <p>
-                    <span className="text-amber-400">$</span> agreekit analyze --data paired_hr.csv --cluster id
-                  </p>
-                  <p className="text-emerald-400">&check; Pass: Mean Bias +0.34 bpm, 95% LoA [-3.8, +4.5]</p>
-                </div>
-              )}
-
-              {/* Exact badge tokens for testing */}
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                <span>Bland-Altman</span>
-                <span>&bull;</span>
-                <span>Bootstrap CI</span>
-                <span>&bull;</span>
-                <span>Non-Inferiority</span>
-              </div>
-            </div>
-
-            <div className="border-t border-hairline pt-4 flex items-center justify-between">
-              <span className="font-mono text-[11px] text-ink-muted">Python &bull; CLI &bull; MCP Server</span>
-              <Link
-                to="/agreekit"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:underline"
-              >
-                <span>Enter agreekit Hub</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </article>
-
-          {/* Card 2: Population Reference Distributions */}
-          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold uppercase text-purple-400">
-                  HEALTH DATA CATALOG
-                </span>
-                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
-                  CDC NHANES &bull; SCIN
-                </span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-ink">
-                <Link to="/health-data-distributions" className="hover:underline focus:outline-hidden">
-                  Ground your protocol in population data
-                </Link>
-              </h2>
-              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-                Planning an accurate study requires knowing how physiological measures naturally vary in real populations. Access reference distributions across various subject demographics and health measures to set realistic baselines before writing your protocol.
-              </p>
-            </div>
-
-            {/* Clean DOM + SVG Distribution Preview */}
-            <div className="my-5 rounded-xl border border-slate-800 bg-[#090d16] p-4 text-white">
-              <svg viewBox="0 0 300 95" className="w-full h-auto select-none" aria-hidden="true">
-                <line x1="15" y1="80" x2="285" y2="80" stroke="#334155" />
-                <path
-                  d="M 25 80 C 65 80, 95 16, 130 16 C 165 16, 195 80, 235 80 Z"
-                  fill="#a855f7"
-                  fillOpacity="0.2"
-                />
-                <path
-                  d="M 25 80 C 65 80, 95 16, 130 16 C 165 16, 195 80, 235 80"
-                  fill="none"
-                  stroke="#a855f7"
-                  strokeWidth="2.2"
-                />
-                <path
-                  d="M 65 80 C 105 80, 135 28, 170 28 C 205 28, 235 80, 275 80"
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeDasharray="4 3"
-                />
-                <line x1="130" y1="16" x2="130" y2="80" stroke="#a855f7" strokeDasharray="2 2" />
-              </svg>
-              <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 font-mono text-[11px] text-slate-300">
-                <span>P5: 52 bpm</span>
-                <span className="font-bold text-purple-300">Median: 71 bpm</span>
-                <span>P95: 96 bpm</span>
-              </div>
-            </div>
-
-            <div className="border-t border-hairline pt-4 flex items-center justify-between">
-              <span className="font-mono text-[11px] text-ink-muted">Weighted Population Baselines</span>
-              <Link
-                to="/health-data-distributions"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-400 hover:underline"
-              >
-                <span>Enter Health Data Hub</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </article>
-
-          {/* Card 3: Reference Device Catalog */}
-          <article className="flex flex-col justify-between rounded-2xl border border-hairline bg-surface p-6 shadow-sm hover:border-ink/25 transition-colors">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold uppercase text-sky-400">
-                  REFERENCE DEVICE CATALOG
-                </span>
-                <span className="rounded bg-plane px-2 py-0.5 font-mono text-[11px] text-ink-muted border border-hairline">
-                  12 Biometric Domains
-                </span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-ink">
-                <Link to="/reference-device-catalog" className="hover:underline focus:outline-hidden">
-                  Evaluate clinical reference standards
-                </Link>
-              </h2>
-              <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-                Selecting the right reference comparator determines regulatory clearance, data pipeline friction, and sample size inflation. Explore 10-dimension engineering profiles across 12 biometric domains covering FDA 510(k) predicates, hardware sync triggers, and consumable budgets.
-              </p>
-            </div>
-
-            {/* Tactile DOM Comparator Tier Cards */}
-            <div className="my-5 space-y-2 rounded-xl border border-slate-800 bg-[#090d16] p-3.5 font-mono text-xs">
-              <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-                <div>
-                  <span className="font-bold text-amber-300">GOLD</span>
-                  <span className="ml-2 text-slate-200">3-Lead Holter / CO-Ox</span>
-                </div>
-                <span className="text-amber-300 font-bold">&sigma;_ref &asymp; 0</span>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2">
-                <div>
-                  <span className="font-bold text-sky-300">SILVER</span>
-                  <span className="ml-2 text-slate-200">Masimo / Bittium Faros</span>
-                </div>
-                <span className="text-sky-300 font-bold">+25% N Penalty</span>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2">
-                <div>
-                  <span className="font-bold text-rose-300">BRONZE</span>
-                  <span className="ml-2 text-slate-200">Consumer Optical Strap</span>
-                </div>
-                <span className="text-rose-300 font-bold">+120% N Penalty</span>
-              </div>
-            </div>
-
-            <div className="border-t border-hairline pt-4 flex items-center justify-between">
-              <span className="font-mono text-[11px] text-ink-muted">10-Dimension Dossiers</span>
-              <Link
-                to="/reference-device-catalog"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:underline"
-              >
-                <span>Enter Reference Catalog</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      {/* =====================================================================
-          STAGE 5: PEER-REVIEWED PROVENANCE & ZERO-TELEMETRY STRIP
-          ===================================================================== */}
-      <section className="rounded-2xl border border-hairline bg-surface p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <OpenWearableValidationLogo size={24} />
-            <h3 className="text-base font-bold text-ink">
-              Engineered for Zero Data Upload &amp; Exact Mathematics
-            </h3>
-          </div>
-          <p className="text-xs sm:text-sm text-ink-secondary max-w-3xl leading-relaxed">
-            Authored by Ross D. Wilkinson, PhD (ex-Google Research Scientist). All calculations execute entirely in your local browser with zero telemetry. Built to replace fragile spreadsheets with exact non-central t intervals and random-effects models.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 shrink-0">
-          <div className="flex items-center gap-4 text-xs font-mono text-ink-muted pr-2">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck size={15} className="text-emerald-400" />
-              Zero Telemetry
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Cpu size={15} className="text-sky-400" />
-              Local Browser Math
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Layers size={15} className="text-indigo-400" />
-              MIT Open Source
-            </span>
-          </div>
-
-          <Link
-            to="/about"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-hairline bg-plane px-4 py-2.5 text-xs font-bold text-ink hover:border-ink/30 transition-all"
+        {/* Panoramic Borderless Underlay: Circular 8-Stage Product Lifecycle */}
+        <div
+          className="relative lg:absolute lg:right-0 lg:inset-y-0 lg:w-[68%] flex items-center mt-8 lg:mt-0 pointer-events-none"
+          style={UNDERLAY_RIGHT_MASK}
+        >
+          <svg
+            viewBox="0 0 760 260"
+            className="w-full h-64 sm:h-72 block select-none"
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden="true"
           >
-            <span>Author credentials &amp; rationale</span>
-            <ArrowRight size={13} />
-          </Link>
+            <defs>
+              <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#818cf8" />
+                <stop offset="50%" stopColor="#6366f1" />
+                <stop offset="100%" stopColor="#a5b4fc" />
+              </linearGradient>
+              <radialGradient id={areaGradId} cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.18" />
+                <stop offset="70%" stopColor="#818cf8" stopOpacity="0.06" />
+                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.0" />
+              </radialGradient>
+            </defs>
+
+            {/* Concentric Orbital Depth Rings bleeding into the panoramic field */}
+            <circle
+              cx={cycleCx}
+              cy={cycleCy}
+              r="195"
+              fill="none"
+              stroke="#6366f1"
+              strokeOpacity="0.1"
+              strokeWidth="1"
+              strokeDasharray="3 6"
+            />
+            <circle
+              cx={cycleCx}
+              cy={cycleCy}
+              r="142"
+              fill="none"
+              stroke="#6366f1"
+              strokeOpacity="0.16"
+              strokeWidth="1"
+              strokeDasharray="4 5"
+            />
+
+            {/* Soft Illuminated Core Inside the Lifecycle Ring */}
+            <circle cx={cycleCx} cy={cycleCy} r={cycleR} fill={`url(#${areaGradId})`} />
+
+            {/* Inner Dashed Reference Ring */}
+            <circle
+              cx={cycleCx}
+              cy={cycleCy}
+              r="54"
+              fill="none"
+              stroke="#818cf8"
+              strokeOpacity="0.28"
+              strokeWidth="1.2"
+              strokeDasharray="3 4"
+            />
+
+            {/* Primary Continuous Circular Lifecycle Track */}
+            <circle
+              cx={cycleCx}
+              cy={cycleCy}
+              r={cycleR}
+              fill="none"
+              stroke={`url(#${lineGradId})`}
+              strokeWidth="3"
+            />
+
+            {/* Clockwise Cycle-Continuation Arrowhead between Stage 08 and Stage 01 (V1 -> V2) */}
+            <g transform="translate(446.3, 48.7) rotate(-22.5)">
+              <polygon points="7,0 -6,-5 -3,0 -6,5" fill="#818cf8" />
+            </g>
+            {/* Second Clockwise Arrowhead between Stage 04 and Stage 05 */}
+            <g transform="translate(513.7, 211.3) rotate(157.5)">
+              <polygon points="7,0 -6,-5 -3,0 -6,5" fill="#818cf8" />
+            </g>
+
+            {/* Center V1 -> V2 Iterative Cycle Hub */}
+            <text
+              x={cycleCx}
+              y={cycleCy - 3}
+              textAnchor="middle"
+              className="fill-indigo-600 dark:fill-indigo-300"
+              fontSize="11"
+              fontFamily="monospace"
+              fontWeight="700"
+            >
+              V1 &rarr; V2
+            </text>
+            <text
+              x={cycleCx}
+              y={cycleCy + 12}
+              textAnchor="middle"
+              className="fill-indigo-500/70 dark:fill-indigo-400/70"
+              fontSize="9"
+              fontFamily="monospace"
+              fontWeight="600"
+            >
+              LIFECYCLE
+            </text>
+
+            {/* 8 Stage Nodes Arranged Radially Around the Circle */}
+            {academyCircularNodes.map((pt, i) => {
+              const nodeColor = i === 0 || i === 7 ? '#a5b4fc' : '#818cf8';
+              return (
+                <g key={pt.num}>
+                  <circle cx={pt.x} cy={pt.y} r="13" fill="#6366f1" fillOpacity="0.2" />
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="5.5"
+                    fill={nodeColor}
+                    stroke="var(--color-plane)"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={pt.lx}
+                    y={pt.ly}
+                    className="fill-indigo-700 dark:fill-indigo-200"
+                    fontSize="11.5"
+                    fontFamily="monospace"
+                    fontWeight="700"
+                    textAnchor="middle"
+                  >
+                    {pt.num}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         </div>
-      </section>
+      </Link>
+
+      {/* =====================================================================
+          ROW 02 (LEFT PANORAMIC UNDERLAY / RIGHT FOREGROUND COPY): PROTOCOL
+          Theme Color: SKY BLUE (Toned-Down Sky Focal Glow + Zero Black Gridlines)
+          ===================================================================== */}
+      <Link
+        to="/protocol-studio"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-end border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Sky Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 left-[10%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(56,189,248,0.22) 0%, rgba(14,165,233,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="relative lg:absolute lg:left-0 lg:inset-y-0 lg:w-[68%] flex items-center order-2 lg:order-1 mt-8 lg:mt-0 pointer-events-none"
+          style={UNDERLAY_LEFT_MASK}
+        >
+          <svg
+            viewBox="0 0 760 260"
+            className="w-full h-60 sm:h-72 block select-none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id={curveGradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Target CI Width Threshold Line (Sky/Cyan dashed) */}
+            <line
+              x1="0"
+              y1="168"
+              x2="760"
+              y2="168"
+              stroke="#0ea5e9"
+              strokeWidth="1.25"
+              strokeDasharray="5 5"
+              strokeOpacity="0.55"
+            />
+
+            <path
+              d="M 0 18 C 160 120, 330 176, 760 218 L 760 260 L 0 260 Z"
+              fill={`url(#${curveGradId})`}
+            />
+            <path
+              d="M 0 18 C 160 120, 330 176, 760 218"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="3"
+            />
+
+            <line
+              x1="310"
+              y1="12"
+              x2="310"
+              y2="260"
+              stroke="#38bdf8"
+              strokeWidth="1.5"
+              strokeDasharray="4 4"
+              strokeOpacity="0.75"
+            />
+            <circle
+              cx="310"
+              cy="154"
+              r="6"
+              fill="#38bdf8"
+              stroke="var(--color-plane)"
+              strokeWidth="2"
+            />
+            <text
+              x="326"
+              y="140"
+              className="fill-sky-600 dark:fill-sky-300"
+              fontSize="14"
+              fontWeight="700"
+              fontFamily="monospace"
+            >
+              N = 42
+            </text>
+          </svg>
+        </div>
+
+        <div className="relative z-10 lg:max-w-md space-y-3 order-1 lg:order-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-500 dark:text-sky-400">
+            PROTOCOL STUDIO
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-sky-500 dark:group-hover:text-sky-400">
+            Design your validation study
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Size clinical cohorts for Limits of Agreement, repeated measures, and demographic quotas.
+          </p>
+        </div>
+      </Link>
+
+      {/* =====================================================================
+          ROW 03 (LEFT FOREGROUND COPY / RIGHT PANORAMIC UNDERLAY): REPORT STUDIO
+          Theme Color: EMERALD (Alternating GO & NO GO Flashing Quadrants)
+          ===================================================================== */}
+      <Link
+        to="/report-studio/overview"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-between border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Emerald Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 right-[8%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, rgba(52,211,153,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 lg:max-w-md space-y-3">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            REPORT STUDIO
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+            Evaluate product launch readiness
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Synthesize validation performance into clear 2&times;2 equivalence decision gates.
+          </p>
+        </div>
+
+        <div
+          className="relative lg:absolute lg:right-0 lg:inset-y-0 lg:w-[68%] flex items-center mt-8 lg:mt-0 pointer-events-none"
+          style={UNDERLAY_RIGHT_MASK}
+        >
+          <svg
+            viewBox="0 0 760 260"
+            className="w-full h-60 sm:h-72 block select-none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <style>{`
+                @keyframes ${pulseKeyframesName} {
+                  0% { transform: scale(0.75); opacity: 0.75; }
+                  38% { transform: scale(2.15); opacity: 0; }
+                  50%, 100% { transform: scale(0.75); opacity: 0; }
+                }
+                @keyframes ${labelFadeKeyframesName} {
+                  0%, 6% { opacity: 0.18; }
+                  18%, 36% { opacity: 1; }
+                  50%, 100% { opacity: 0.18; }
+                }
+              `}</style>
+            </defs>
+
+            {/* Top-Right "GO" Quadrant Wash (Emerald) */}
+            <rect x="380" y="0" width="380" height="130" fill="#10b981" fillOpacity="0.12" />
+
+            {/* Bottom-Left "NO GO" Quadrant Wash (Subtle Red/Rose) */}
+            <rect x="0" y="130" width="380" height="130" fill="#f43f5e" fillOpacity="0.09" />
+
+            {/* Delicate Theme-Safe 2x2 Quadrant Divider Lines */}
+            <line
+              x1="0"
+              y1="130"
+              x2="760"
+              y2="130"
+              stroke="#10b981"
+              strokeOpacity="0.3"
+              strokeWidth="1.2"
+              strokeDasharray="5 4"
+            />
+            <line
+              x1="380"
+              y1="0"
+              x2="380"
+              y2="260"
+              stroke="#10b981"
+              strokeOpacity="0.3"
+              strokeWidth="1.2"
+              strokeDasharray="5 4"
+            />
+
+            {/* ===============================================================
+                TOP-RIGHT QUADRANT: "GO" POINT + SYNCHRONIZED LABEL (Phase 0s)
+                =============================================================== */}
+            <circle
+              cx="550"
+              cy="65"
+              r="16"
+              fill="#10b981"
+              style={{
+                transformBox: 'fill-box',
+                transformOrigin: 'center',
+                animation: `${pulseKeyframesName} 4s cubic-bezier(0, 0, 0.2, 1) infinite`,
+              }}
+            />
+            <g
+              style={{
+                animation: `${labelFadeKeyframesName} 4s ease-in-out infinite`,
+              }}
+            >
+              <circle
+                cx="550"
+                cy="65"
+                r="22"
+                fill="#10b981"
+                fillOpacity="0.18"
+                stroke="#10b981"
+                strokeOpacity="0.55"
+                strokeWidth="1.25"
+              />
+              <text
+                x="582"
+                y="70"
+                className="fill-emerald-600 dark:fill-emerald-400"
+                fontSize="14"
+                fontWeight="700"
+                fontFamily="monospace"
+              >
+                GO
+              </text>
+            </g>
+            <circle cx="550" cy="65" r="6" fill="#10b981" stroke="#a7f3d0" strokeWidth="2" />
+
+            {/* ===============================================================
+                BOTTOM-LEFT QUADRANT: "NO GO" POINT + SYNCHRONIZED LABEL (Phase +2s)
+                =============================================================== */}
+            <circle
+              cx="272"
+              cy="195"
+              r="16"
+              fill="#f43f5e"
+              style={{
+                transformBox: 'fill-box',
+                transformOrigin: 'center',
+                animation: `${pulseKeyframesName} 4s cubic-bezier(0, 0, 0.2, 1) 2s infinite`,
+                opacity: 0,
+              }}
+            />
+            <g
+              style={{
+                animation: `${labelFadeKeyframesName} 4s ease-in-out 2s infinite`,
+                opacity: 0.18,
+              }}
+            >
+              <circle
+                cx="272"
+                cy="195"
+                r="22"
+                fill="#f43f5e"
+                fillOpacity="0.18"
+                stroke="#f43f5e"
+                strokeOpacity="0.55"
+                strokeWidth="1.25"
+              />
+              <text
+                x="304"
+                y="200"
+                className="fill-rose-600 dark:fill-rose-400"
+                fontSize="14"
+                fontWeight="700"
+                fontFamily="monospace"
+              >
+                NO GO
+              </text>
+            </g>
+            <circle cx="272" cy="195" r="6" fill="#f43f5e" stroke="#fecdd3" strokeWidth="2" />
+          </svg>
+        </div>
+      </Link>
+
+      {/* =====================================================================
+          ROW 04 (LEFT PANORAMIC UNDERLAY / RIGHT FOREGROUND COPY): PITFALLS
+          Theme Color: ROSE (Toned-Down Rose Focal Glow + Fitted Regression Line)
+          ===================================================================== */}
+      <Link
+        to="/explainers"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-end border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Rose Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 left-[10%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(244,63,94,0.22) 0%, rgba(251,113,133,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="relative lg:absolute lg:left-0 lg:inset-y-0 lg:w-[68%] flex items-center order-2 lg:order-1 mt-8 lg:mt-0 pointer-events-none"
+          style={UNDERLAY_LEFT_MASK}
+        >
+          <svg
+            viewBox="0 0 760 260"
+            className="w-full h-60 sm:h-72 block select-none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <filter id={trapGlowId} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            {/* Shaded Bias Gap Between True Identity Line and Biased Best-Fit Line */}
+            <polygon points="0,250 760,54 760,14 0,210" fill="#f43f5e" fillOpacity="0.12" />
+
+            {/* Subtle Theme-Safe Identity Reference Line */}
+            <line
+              x1="0"
+              y1="250"
+              x2="760"
+              y2="54"
+              stroke="#f43f5e"
+              strokeOpacity="0.38"
+              strokeWidth="1.25"
+              strokeDasharray="5 5"
+            />
+
+            {/* Biased Line of Best Fit Passing Directly Through the Scatter Points */}
+            <line
+              x1="0"
+              y1="210"
+              x2="760"
+              y2="14"
+              stroke="#f43f5e"
+              strokeWidth="3"
+              filter={`url(#${trapGlowId})`}
+            />
+
+            {scatterPoints.map((pt) => (
+              <g key={pt.x}>
+                <circle cx={pt.x} cy={pt.y} r="8" fill="#f43f5e" fillOpacity="0.22" />
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="4"
+                  fill="#fb7185"
+                  stroke="var(--color-plane)"
+                  strokeWidth="1.25"
+                />
+              </g>
+            ))}
+
+            <text
+              x="120"
+              y="44"
+              className="fill-rose-600 dark:fill-rose-400"
+              fontSize="13"
+              fontWeight="700"
+              fontFamily="monospace"
+            >
+              r = 0.96 &bull; BIAS TRAP
+            </text>
+          </svg>
+        </div>
+
+        <div className="relative z-10 lg:max-w-md space-y-3 order-1 lg:order-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400">
+            PITFALL EXPLORER
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-rose-500 dark:group-hover:text-rose-400">
+            Avoid costly statistical pitfalls
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            See why standard correlation metrics fail on paired wearable sensor data.
+          </p>
+        </div>
+      </Link>
+
+      {/* =====================================================================
+          ROW 05 (LEFT FOREGROUND COPY / RIGHT PANORAMIC CODE): AGREEKIT
+          Theme Color: AMBER (Toned-Down Pure Amber Focal Glow)
+          ===================================================================== */}
+      <Link
+        to="/agreekit"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-between border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Amber Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 right-[8%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(245,158,11,0.20) 0%, rgba(251,191,36,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 lg:max-w-md space-y-3">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-amber-500 dark:text-amber-400">
+            <AgreekitLogo size={14} />
+            <span>AGREEKIT</span>
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-amber-500 dark:group-hover:text-amber-400">
+            Execute agreement analyses in Python
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Run exact agreement statistics, variance decompositions, and bootstrap confidence intervals in Python.
+          </p>
+        </div>
+
+        <div
+          className="relative lg:absolute lg:right-0 lg:inset-y-0 lg:w-[62%] flex flex-col justify-center mt-8 lg:mt-0 font-mono text-xs sm:text-sm space-y-3"
+          style={UNDERLAY_RIGHT_MASK}
+        >
+          <div className="flex items-center justify-between border-b border-hairline dark:border-[#27272a] pb-3 px-8 lg:pl-20">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
+            </div>
+            <span className="text-amber-600 dark:text-amber-400 font-bold">$ pip install agreekit</span>
+          </div>
+
+          <div className="px-8 lg:pl-20 py-2 space-y-2.5 leading-relaxed">
+            <p>
+              <span className="text-purple-600 dark:text-purple-400">import</span>{' '}
+              <span className="text-ink font-semibold">agreekit</span>{' '}
+              <span className="text-purple-600 dark:text-purple-400">as</span>{' '}
+              <span className="text-ink font-semibold">ak</span>
+            </p>
+            <p>
+              <span className="text-ink-secondary">res = </span>
+              <span className="text-sky-600 dark:text-sky-400 font-semibold">ak.analyze</span>
+              <span className="text-ink-secondary">(ref=</span>
+              <span className="text-amber-600 dark:text-amber-400">ecg</span>
+              <span className="text-ink-secondary">, test=</span>
+              <span className="text-amber-600 dark:text-amber-400">ppg</span>
+              <span className="text-ink-secondary">)</span>
+            </p>
+            <p className="flex items-center text-emerald-600 dark:text-emerald-400">
+              <span># Bland-Altman &bull; Bootstrap CI &bull; Non-Inferiority</span>
+              <span
+                className="ml-2 inline-block h-4 w-2 bg-amber-500 dark:bg-amber-400 animate-pulse"
+                aria-hidden="true"
+              />
+            </p>
+          </div>
+        </div>
+      </Link>
+
+      {/* =====================================================================
+          ROW 06 (LEFT PANORAMIC UNDERLAY / RIGHT FOREGROUND COPY): HEALTH DATA
+          Theme Color: SKY / CYAN (Toned-Down Sky/Cyan Focal Glow)
+          ===================================================================== */}
+      <Link
+        to="/health-data-distributions"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-end border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Sky/Cyan Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 left-[10%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(56,189,248,0.22) 0%, rgba(34,211,238,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="relative lg:absolute lg:left-0 lg:inset-y-0 lg:w-[68%] flex items-center order-2 lg:order-1 mt-8 lg:mt-0 pointer-events-none"
+          style={UNDERLAY_LEFT_MASK}
+        >
+          <svg
+            viewBox="0 0 760 260"
+            className="w-full h-60 sm:h-72 block select-none"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <filter id={distGlowId} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <linearGradient id={distGradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Secondary Stratified Cohort Curve */}
+            <path
+              d="M 0 248 C 200 248, 315 64, 440 64 C 565 64, 660 248, 760 248"
+              fill="none"
+              stroke="#0ea5e9"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+              strokeOpacity="0.5"
+            />
+
+            <path
+              d="M 0 248 C 160 248, 265 32, 380 32 C 495 32, 600 248, 760 248 L 760 260 L 0 260 Z"
+              fill={`url(#${distGradId})`}
+            />
+            <path
+              d="M 0 248 C 160 248, 265 32, 380 32 C 495 32, 600 248, 760 248"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="3"
+              filter={`url(#${distGlowId})`}
+            />
+
+            <g filter={`url(#${distGlowId})`}>
+              <line x1="204" y1="146" x2="204" y2="256" stroke="#22d3ee" strokeWidth="1.5" strokeDasharray="3 3" />
+              <circle cx="204" cy="146" r="4" fill="#22d3ee" />
+
+              <line x1="380" y1="32" x2="380" y2="256" stroke="#38bdf8" strokeWidth="2" />
+              <circle cx="380" cy="32" r="5.5" fill="#38bdf8" stroke="#e0f2fe" strokeWidth="1.5" />
+
+              <line x1="556" y1="146" x2="556" y2="256" stroke="#22d3ee" strokeWidth="1.5" strokeDasharray="3 3" />
+              <circle cx="556" cy="146" r="4" fill="#22d3ee" />
+            </g>
+
+            <g fontFamily="monospace" fontSize="12" fontWeight="700">
+              <text x="194" y="136" className="fill-sky-600 dark:fill-cyan-300" textAnchor="end">
+                P5
+              </text>
+              <text x="380" y="20" className="fill-sky-700 dark:fill-sky-100" textAnchor="middle">
+                MEDIAN
+              </text>
+              <text x="566" y="136" className="fill-sky-600 dark:fill-cyan-300" textAnchor="start">
+                P95
+              </text>
+            </g>
+          </svg>
+        </div>
+
+        <div className="relative z-10 lg:max-w-md space-y-3 order-1 lg:order-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-sky-500 dark:text-sky-400">
+            HEALTH DATA CATALOG
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-sky-500 dark:group-hover:text-sky-400">
+            Ground your protocol in population data
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Reference normative physiological distributions across age, sex, and skin tone cohorts.
+          </p>
+        </div>
+      </Link>
+
+      {/* =====================================================================
+          ROW 07 (LEFT FOREGROUND COPY / RIGHT TALL METALLIC PILLARS): REFERENCE
+          Theme Color: EMERALD (Toned-Down Emerald Focal Glow)
+          ===================================================================== */}
+      <Link
+        to="/reference-device-catalog"
+        className="group relative flex flex-col lg:flex-row lg:items-center justify-between border-b border-hairline dark:border-[#27272a] py-12 lg:py-0 lg:h-[320px] min-h-[320px] overflow-hidden"
+      >
+        {/* Toned-Down Pure Emerald Focal Backlight */}
+        <div
+          className="pointer-events-none absolute top-1/2 right-[8%] h-64 w-[500px] -translate-y-1/2 rounded-full opacity-60 blur-[90px] transition-all duration-500 group-hover:scale-105 group-hover:opacity-85"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(16,185,129,0.20) 0%, rgba(52,211,153,0.10) 50%, transparent 100%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 lg:max-w-md space-y-3">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            REFERENCE DEVICE CATALOG
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-ink transition-colors group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+            Evaluate clinical reference standards
+          </h2>
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed">
+            Compare clinical predicates, reference uncertainties, and sample-size penalties across 12 domains.
+          </p>
+        </div>
+
+        {/* 3 Vertical Borderless Metallic Pillars Filling the Section Height */}
+        <div className="relative z-10 lg:w-[58%] grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8 lg:mt-0 font-mono text-xs">
+          <div className="h-52 flex flex-col justify-between border-t-2 border-[#fbbf24] bg-[linear-gradient(180deg,rgba(251,191,36,0.18)_0%,transparent_100%)] p-5">
+            <span className="font-bold text-sm text-amber-600 dark:text-[#fbbf24]">GOLD</span>
+            <span className="font-semibold text-base text-ink">3-Lead Holter</span>
+            <span className="font-bold text-sm text-amber-600 dark:text-[#fbbf24] drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]">
+              &sigma;_ref &asymp; 0
+            </span>
+          </div>
+
+          <div className="h-52 flex flex-col justify-between border-t-2 border-[#94a3b8] bg-[linear-gradient(180deg,rgba(148,163,184,0.18)_0%,transparent_100%)] p-5">
+            <span className="font-bold text-sm text-slate-600 dark:text-[#94a3b8]">SILVER</span>
+            <span className="font-semibold text-base text-ink">Clinical Patch</span>
+            <span className="font-bold text-sm text-slate-700 dark:text-[#cbd5e1] drop-shadow-[0_0_6px_rgba(148,163,184,0.3)]">
+              +25% N
+            </span>
+          </div>
+
+          <div className="h-52 flex flex-col justify-between border-t-2 border-[#b45309] bg-[linear-gradient(180deg,rgba(180,83,9,0.24)_0%,transparent_100%)] p-5">
+            <span className="font-bold text-sm text-amber-700 dark:text-[#d97706]">BRONZE</span>
+            <span className="font-semibold text-base text-ink">Optical Strap</span>
+            <span className="font-bold text-sm text-amber-700 dark:text-[#f59e0b] drop-shadow-[0_0_6px_rgba(217,119,6,0.35)]">
+              +120% N
+            </span>
+          </div>
+        </div>
+      </Link>
     </div>
   );
 }

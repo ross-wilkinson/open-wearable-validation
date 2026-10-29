@@ -19,7 +19,7 @@ describe('App shell', () => {
       'Design your validation study',
       'Evaluate product launch readiness',
       'Avoid costly statistical pitfalls',
-      'Learn wearable validation hands-on',
+      'The Validation Academy: Learn wearable validation hands-on',
       'Execute agreement analyses in Python',
       'Ground your protocol in population data',
       'Evaluate clinical reference standards',
@@ -32,7 +32,7 @@ describe('App shell', () => {
   it('displays links to Health Data Catalog and agreekit', () => {
     render(<App />);
     expect(
-      screen.getAllByRole('link', { name: /health data (catalog|distributions)/i }).length,
+      screen.getAllByRole('link', { name: /health data (catalog|distributions|hub)/i }).length,
     ).toBeGreaterThan(0);
     expect(
       screen.getAllByRole('link', { name: /agreekit/i }).length,

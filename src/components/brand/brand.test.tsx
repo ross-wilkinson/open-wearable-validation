@@ -15,6 +15,15 @@ import { AgreekitLogo, AgreekitIcon } from './AgreekitLogo.tsx';
 import { PulseBandHardwareGraphic } from './PulseBandHardwareGraphic.tsx';
 import { HardwareChangeMatrix, HARDWARE_TIERS } from './HardwareChangeMatrix.tsx';
 import { BrandShowcase } from './BrandShowcase.tsx';
+import {
+  LogoConcepts,
+  OwvConcept1Aperture,
+  OwvConcept2Eclipse,
+  OwvConcept3Monolith,
+  AgreekitConcept1Mobius,
+  AgreekitConcept2PhaseArray,
+  AgreekitConcept3Equilibrium,
+} from './LogoConcepts.tsx';
 import { BRAND_CONFIG } from '../../config/brand.ts';
 
 describe('Brand Components', () => {
@@ -184,6 +193,68 @@ describe('Brand Components', () => {
           name: /meridian pulseband 2 — multi-wavelength optical stack/i,
         }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('LogoConcepts (Abstract & Iconic Brand Marks)', () => {
+    it('renders all 6 Round 8 R2-01 Refined & 180-Degree Twin SVG marks and allows switching across rounds', async () => {
+      const user = userEvent.setup();
+      renderWithStudy(<LogoConcepts />);
+
+      expect(screen.getByText('The Pure Pulse Aperture')).toBeInTheDocument();
+      expect(screen.getByText('The Continuous O-W-V Trace')).toBeInTheDocument();
+      expect(screen.getByText('The Hero-Triad Verified Pulse')).toBeInTheDocument();
+      expect(screen.getByText('The Pythonic Inversion (180° Twin)')).toBeInTheDocument();
+      expect(screen.getByText('The Continuous Capital "A" Inversion')).toBeInTheDocument();
+      expect(screen.getByText('The Hero-Triad 180° Twin')).toBeInTheDocument();
+
+      // Toggle Carbon App Squircle plate mode
+      await user.click(screen.getByRole('button', { name: /carbon app squircle/i }));
+      expect(screen.getAllByRole('img', { name: /the pure pulse aperture/i }).length).toBeGreaterThan(0);
+
+      // Switch to Round 7 archive
+      await user.click(screen.getByRole('button', { name: /round 7/i }));
+      expect(screen.getByText('The Hero-Triad OWV (Sky + Emerald + Purple)')).toBeInTheDocument();
+
+      // Switch to Round 6 archive
+      await user.click(screen.getByRole('button', { name: /^round 6$/i }));
+      expect(screen.getByText('The Ground-Truth "V" & Departing "W" Signal')).toBeInTheDocument();
+
+      // Switch to Round 5 archive
+      await user.click(screen.getByRole('button', { name: /^round 5$/i }));
+      expect(screen.getByText('The Inverted-VW Bezel Break')).toBeInTheDocument();
+
+      // Switch to Round 3 archive
+      await user.click(screen.getByRole('button', { name: /^round 3$/i }));
+      expect(screen.getByText('The Asymmetric O-W-V Pulse Check')).toBeInTheDocument();
+
+      // Switch to Round 2 archive
+      await user.click(screen.getByRole('button', { name: /^round 2$/i }));
+      expect(screen.getByText('The Verified Pulse Ring')).toBeInTheDocument();
+
+      // Switch to Round 1 archive
+      await user.click(screen.getByRole('button', { name: /^round 1$/i }));
+      expect(screen.getByText('The Isometric Aperture')).toBeInTheDocument();
+    });
+
+    it('renders individual abstract SVG components at custom responsive sizes', () => {
+      renderWithStudy(
+        <div>
+          <OwvConcept1Aperture size={16} />
+          <OwvConcept2Eclipse size={32} withPlate />
+          <OwvConcept3Monolith size={64} />
+          <AgreekitConcept1Mobius size={16} />
+          <AgreekitConcept2PhaseArray size={32} withPlate />
+          <AgreekitConcept3Equilibrium size={64} />
+        </div>,
+      );
+
+      expect(screen.getByRole('img', { name: /open wearable validation concept 1: the pure pulse aperture/i })).toHaveAttribute('width', '16');
+      expect(screen.getByRole('img', { name: /open wearable validation concept 2: the continuous o-w-v trace/i })).toHaveAttribute('width', '32');
+      expect(screen.getByRole('img', { name: /open wearable validation concept 3: the hero-triad verified pulse/i })).toHaveAttribute('width', '64');
+      expect(screen.getByRole('img', { name: /agreekit concept 1: the pythonic inversion/i })).toHaveAttribute('width', '16');
+      expect(screen.getByRole('img', { name: /agreekit concept 2: the continuous capital a inversion/i })).toHaveAttribute('width', '32');
+      expect(screen.getByRole('img', { name: /agreekit concept 3: the hero-triad 180-degree twin/i })).toHaveAttribute('width', '64');
     });
   });
 });

@@ -5,6 +5,7 @@ import { MeridianLogo, MeridianIcon } from './MeridianLogo.tsx';
 import { AgreekitLogo } from './AgreekitLogo.tsx';
 import { PulseBandHardwareGraphic } from './PulseBandHardwareGraphic.tsx';
 import { HardwareChangeMatrix } from './HardwareChangeMatrix.tsx';
+import { LogoConcepts } from './LogoConcepts.tsx';
 import { CheckCircle2, Copy, Sparkles, ShieldCheck, Palette } from 'lucide-react';
 import { BRAND_CONFIG } from '../../config/brand.ts';
 
@@ -132,6 +133,9 @@ export function BrandShowcase() {
           </div>
         </div>
       </div>
+
+      {/* Abstract & Iconic Brand Mark Explorations */}
+      <LogoConcepts />
 
       {/* Color Palette Tokens */}
       <div className="rounded-2xl border border-hairline bg-surface p-6 space-y-4">

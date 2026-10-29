@@ -24,6 +24,7 @@ import ProtocolStudioLandingPage from '../pages/ProtocolStudioLandingPage.tsx';
 import ReportStudioLandingPage from '../pages/ReportStudioLandingPage.tsx';
 import AgreekitLandingPage from '../pages/AgreekitLandingPage.tsx';
 import HealthDataLandingPage from '../pages/HealthDataLandingPage.tsx';
+import LogoConcepts from '../components/brand/LogoConcepts.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 
 /**
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="/agreekit" element={<AgreekitLandingPage />} />
               <Route path="/health-data-distributions" element={<HealthDataLandingPage />} />
               <Route path="/health-data-catalog" element={<HealthDataLandingPage />} />
+              <Route path="/logo-concepts" element={<LogoConcepts />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
