@@ -240,6 +240,12 @@ export default function AcademyPage() {
       <NextSteps
         steps={[
           {
+            to: '/academy/astro-calval',
+            title: 'Cross-Domain Case Study: Astronomy Cal/Val Report',
+            description:
+              'Same math, different photons: explore how wearable validation statistics apply to Rubin LSST photometric redshift calibration.',
+          },
+          {
             to: '/agreement',
             title: 'Protocol Studio: Study Design & Sizing',
             description:

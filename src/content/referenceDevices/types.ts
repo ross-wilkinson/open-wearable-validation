@@ -1,9 +1,11 @@
 /**
- * Types and interfaces for Reference Device Selection across clinical validation.
+ * Types and interfaces for Reference Device & Clinical Trial Instrument Selection
+ * across wearable biometric validation and clinical research.
  *
  * Grounded in regulatory standards (FDA 510(k), De Novo, ISO 80601-2-61, ISO 81060-2,
- * ANSI/AAMI EC13, AASM) and engineering realities (data pipelines, clock drift,
- * signal synchronization, consumable burn rates).
+ * ANSI/AAMI EC13, AASM) and engineering/clinical trial realities (data pipelines,
+ * firmware version control, API/contract walls, clock drift, signal synchronization,
+ * cohort sensitivities, and consumable burn rates).
  */
 
 export type ReferenceTier = 'gold' | 'silver' | 'bronze';
@@ -21,6 +23,75 @@ export type FeatureDomainId =
   | 'cardiorespiratory'
   | 'activity_calories'
   | 'eda_stress';
+
+export type FormFactorType =
+  | 'chest_strap'
+  | 'adhesive_patch'
+  | 'holter_harness'
+  | 'smartwatch_wrist'
+  | 'smart_ring'
+  | 'fingertip_clip'
+  | 'eeg_headband'
+  | 'under_mattress_mat'
+  | 'arm_cuff'
+  | 'ingestible_pill'
+  | 'skin_logger'
+  | 'footpod_imu'
+  | 'benchtop_clinical'
+  | 'cgm_sensor';
+
+export type DataGranularityTier =
+  | 'raw_waveform'        // Unfiltered Hz-level physiological waveform (e.g., 1000 Hz EDF+ ECG)
+  | 'beat_to_beat_ibi'    // Millisecond R-R or inter-beat intervals
+  | 'epoch_30s_clinical'  // Standard 30-second clinical scoring epochs (e.g., AASM sleep staging)
+  | 'epoch_1m_to_5m'      // Consumer multi-minute blocks (e.g., Oura 5-min sleep/HRV arrays)
+  | 'summary_only';       // Daily/nightly or session aggregate summaries only
+
+export type OffloadMechanism =
+  | 'direct_local_usb_sd' // Physical USB mass storage / SD card (no cloud required)
+  | 'open_ble_sdk'        // Direct Bluetooth Low Energy GATT / open local SDK
+  | 'cloud_rest_api'      // Vendor cloud portal + REST API
+  | 'mobile_os_sandbox'   // On-phone database only (e.g., Apple HealthKit SQLite)
+  | 'manual_entry';       // Visual display / manual eCRF transcription
+
+export interface ValidationCitation {
+  authors: string;        // e.g., "Gilgen-Ammann et al."
+  year: number;           // e.g., 2019
+  title: string;
+  journal: string;        // e.g., "Eur J Appl Physiol"
+  doiOrPmid?: string;     // e.g., "10.1007/s00421-019-04142-5"
+  sampleSize: string;     // e.g., "n = 30 healthy adults"
+  protocolContext: string;// e.g., "Graded exercise from rest to vigorous running vs. 3-lead Holter"
+  reportedResult: string; // Traceable result (e.g., "RR interval correlation r = 0.994; 99.6% valid beats")
+}
+
+export interface StudyInstrumentProfile {
+  formFactor: FormFactorType;
+  typicalBatteryLife: string;            // e.g., "4–7 days", "18–36 hours (requires daily charging)"
+  dataGranularity: DataGranularityTier;
+  granularityDetails: string;            // Explicit statement of what is accessible vs. locked
+  offloadMechanism: OffloadMechanism;
+  firmwareLockSupported: boolean;        // Can firmware & scoring algorithms be frozen for longitudinal trials?
+  algorithmStabilityNotes: string;       // Notes on OTA drift, cloud re-scoring, or version locking
+  contractAndCostWalls: string[];        // Unexpected commercial/API walls (minimum seats, subscriptions, BAA fees)
+  supportedCapabilities: {
+    continuous24hIbi: boolean;           // True only if device captures waking + sleeping beat-to-beat intervals
+    nocturnalRestingHrv: boolean;        // Overnight resting RMSSD / SDNN
+    aasm30sSleepStaging: boolean;        // 30-second epoch sleep staging
+    consumerSleepSummary: boolean;       // 5-min blocks or nightly TST / WASO / efficiency summaries
+    multiWeekHabitualCompliance: boolean;// Feasible for weeks/months of free-living wear in older cohorts
+  };
+  useFor: string[];                      // Specific study designs and estimands this device is fit for
+  doNotUseFor: string[];                 // Study designs where this device will fail or mislead
+  cohortConsiderations: {
+    agingAndNeuro: string;               // Tremor, cognitive charging burden, skin fragility, nocturnal wandering
+    arrhythmiaAndEctopy: string;         // How AFib/PVCs affect the reported metrics
+    skinToneAndPerfusion: string;        // Melanin absorption or peripheral vasoconstriction impacts
+  };
+  validationCitations: ValidationCitation[];
+  measurementSdSource: string;           // Citation or derivation note for measurementSd (or "Unsourced assumption")
+  reviewStatus: 'draft' | 'reviewed';    // Per CLAUDE.md Invariant 6
+}
 
 export interface FeatureDomain {
   id: FeatureDomainId;
@@ -111,4 +182,7 @@ export interface ReferenceDevice {
   // Statistical Noise Floor (for sample size inflation calculations)
   measurementSd: number; // Reference noise standard deviation in domain primaryUnit
   repeatabilityLimit: number; // 2.77 * measurementSd
+
+  // Clinical Trial Instrument & Protocol Fit Profile
+  studyInstrument?: StudyInstrumentProfile;
 }

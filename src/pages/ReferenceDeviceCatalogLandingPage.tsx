@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
+  ArrowUpRight,
   CheckCircle2,
   Cpu,
   Database,
@@ -288,6 +289,7 @@ export default function ReferenceDeviceCatalogLandingPage() {
             const devices = getDevicesForDomain(domain.id);
             const gold = devices.find((d) => d.tier === 'gold');
             const silver = devices.find((d) => d.tier === 'silver');
+            const bronze = devices.find((d) => d.tier === 'bronze');
 
             return (
               <Link
@@ -297,21 +299,27 @@ export default function ReferenceDeviceCatalogLandingPage() {
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted">
-                      {domain.primaryUnit}
-                    </span>
-                    {domain.isPriorityTop5 && (
-                      <span className="rounded-md bg-series-1/10 px-1.5 py-0.5 text-[9px] font-bold text-series-1 uppercase">
-                        Core 5
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                        {domain.primaryUnit}
                       </span>
-                    )}
+                      {domain.isPriorityTop5 && (
+                        <span className="rounded-md bg-series-1/10 px-1.5 py-0.5 text-[9px] font-bold text-series-1 uppercase">
+                          Core 5
+                        </span>
+                      )}
+                    </div>
+                    <ArrowUpRight
+                      size={16}
+                      className="text-ink-muted transition-transform group-hover:text-series-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                    />
                   </div>
 
                   <div>
                     <h3 className="text-base font-bold text-ink group-hover:text-series-1 transition-colors">
                       {domain.name}
                     </h3>
-                    <p className="text-xs text-ink-secondary mt-1 leading-relaxed line-clamp-2">
+                    <p className="text-xs text-ink-secondary mt-1 leading-relaxed">
                       {domain.description}
                     </p>
                   </div>
@@ -319,23 +327,31 @@ export default function ReferenceDeviceCatalogLandingPage() {
                   {/* Standards Summary */}
                   <div className="border-t border-hairline pt-2.5 space-y-1.5 text-[11px]">
                     <div className="flex items-center justify-between">
-                      <span className="text-amber-700 font-semibold">Gold Standard:</span>
-                      <span className="font-medium text-ink truncate max-w-[150px]">
+                      <span className="text-amber-700 dark:text-amber-300 font-semibold">Gold:</span>
+                      <span className="font-medium text-ink text-right">
                         {gold?.name ?? 'Clinical Criterion'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-blue-700 font-semibold">Silver Benchmark:</span>
-                      <span className="font-medium text-ink truncate max-w-[150px]">
+                      <span className="text-blue-700 dark:text-blue-300 font-semibold">Silver:</span>
+                      <span className="font-medium text-ink text-right">
                         {silver?.name ?? 'Research Telemetry'}
                       </span>
                     </div>
+                    {bronze && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-orange-700 dark:text-orange-300 font-semibold">Bronze:</span>
+                        <span className="font-medium text-ink text-right">
+                          {bronze.name}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 border-t border-hairline pt-3 flex items-center justify-between text-xs font-semibold text-series-1">
-                  <span>Explore Standards</span>
-                  <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
+                <div className="mt-4 border-t border-hairline pt-3 flex items-center justify-between text-[11px] text-ink-muted">
+                  <span>{devices.length} Reference &amp; Study Instruments</span>
+                  <span className="font-mono font-semibold text-series-1">Inspect Domain →</span>
                 </div>
               </Link>
             );

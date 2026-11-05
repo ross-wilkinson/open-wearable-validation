@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { StudyProvider } from './study/StudyContext.tsx';
 import ScrollToTop from '../components/layout/ScrollToTop.tsx';
@@ -26,6 +27,14 @@ import AgreekitLandingPage from '../pages/AgreekitLandingPage.tsx';
 import HealthDataLandingPage from '../pages/HealthDataLandingPage.tsx';
 import LogoConcepts from '../components/brand/LogoConcepts.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
+
+// Lazy: the showcase ships a ~50 KB pre-computed JSON payload that no other
+// route needs, so it stays out of the main bundle.
+const AstroCalValPage = lazy(() => import('../modules/astroCalVal/AstroCalValPage.tsx'));
+const AstroStudyProtocolPage = lazy(
+  () => import('../modules/astroCalVal/AstroStudyProtocolPage.tsx'),
+);
+const AstroPrimersPage = lazy(() => import('../modules/astroCalVal/AstroPrimersPage.tsx'));
 
 /**
  * BrowserRouter for clean URLs and client-side deep linking.
@@ -66,6 +75,38 @@ export default function App() {
                 element={<SniffTestExplainerPage />}
               />
               <Route path="/academy" element={<AcademyPage />} />
+              <Route
+                path="/academy/astro-calval"
+                element={
+                  <Suspense fallback={null}>
+                    <AstroCalValPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/academy/astro-calval/study-protocol"
+                element={
+                  <Suspense fallback={null}>
+                    <AstroStudyProtocolPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/academy/astro-calval/primers"
+                element={
+                  <Suspense fallback={null}>
+                    <AstroPrimersPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/academy/astro-calval/primers/:topic"
+                element={
+                  <Suspense fallback={null}>
+                    <AstroPrimersPage />
+                  </Suspense>
+                }
+              />
               <Route path="/curriculum" element={<AcademyPage />} />
               <Route path="/protocol-studio" element={<ProtocolStudioLandingPage />} />
               <Route path="/protocol" element={<ProtocolStudioLandingPage />} />

@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -12,11 +13,14 @@ import {
   Database,
   DollarSign,
   ExternalLink,
+  FlaskConical,
   Layers,
+  Lock,
   Scale,
   ShieldCheck,
   Sparkles,
   Table as TableIcon,
+  Unlock,
   X,
   Zap,
 } from 'lucide-react';
@@ -32,16 +36,55 @@ import { FEATURE_DOMAINS } from '../../content/referenceDevices/catalog.ts';
 import {
   calculateReferenceNoiseImpact,
   calculateStudyConsumableBudget,
+  DATA_GRANULARITY_LABELS,
+  DEFAULT_PROTOCOL_CONSTRAINTS,
+  diagnoseProtocolConflicts,
+  evaluateProtocolFit,
   filterDevices,
+  FORM_FACTOR_LABELS,
   getDevicesForDomain,
   getDomainById,
+  OFFLOAD_MECHANISM_LABELS,
+  STUDY_ARCHETYPE_PRESETS,
+  type ProtocolConstraints,
 } from './referenceDevicesModel.ts';
 
 const TIER_OPTIONS = [
   { value: 'all', label: 'All Standards (Gold, Silver, Bronze)' },
   { value: 'gold', label: 'Gold Standard (Clinical Criterion)' },
   { value: 'silver', label: 'Silver Standard (Clinical Research Benchmark)' },
-  { value: 'bronze', label: 'Bronze Standard (Consumer Surrogate)' },
+  { value: 'bronze', label: 'Bronze Standard (Consumer / Wearable Instrument)' },
+] as const;
+
+const ENDPOINT_STATUS_OPTIONS = [
+  { value: 'any', label: 'Any Endpoint Role' },
+  { value: 'exploratory_trend', label: 'Exploratory / Observational Trend' },
+  { value: 'formal_trial_endpoint', label: 'Formal Trial Endpoint (Locked Firmware)' },
+] as const;
+
+const PHYSIOLOGICAL_CONSTRUCT_OPTIONS = [
+  { value: 'any', label: 'Any Sampling Window' },
+  { value: 'nocturnal_or_resting', label: 'Nocturnal / Resting Window Only' },
+  { value: 'continuous_24h_ambulatory', label: 'Continuous 24-Hour (Waking + Sleeping)' },
+] as const;
+
+const REQUIRED_GRANULARITY_OPTIONS = [
+  { value: 'any', label: 'Any Temporal Resolution' },
+  { value: 'summary_or_5min', label: 'Nightly Summaries or 5-Min Blocks' },
+  { value: 'epoch_30s_clinical', label: '30-Second Clinical Epochs (AASM)' },
+  { value: 'beat_to_beat_or_raw', label: 'Beat-to-Beat IBI (RR) or Raw Waveform' },
+] as const;
+
+const MONITORING_CADENCE_OPTIONS = [
+  { value: 'any', label: 'Any Wear Duration' },
+  { value: 'episodic_1_to_2_nights', label: 'Episodic Snapshot (24–48 Hours)' },
+  { value: 'habitual_multi_week', label: 'Multi-Week Habitual Free-Living' },
+] as const;
+
+const DATA_OFFLOAD_OPTIONS = [
+  { value: 'any', label: 'Any Data Offload Model' },
+  { value: 'remote_cloud_sync', label: 'Remote Cloud / API Sync' },
+  { value: 'direct_local_offload', label: 'Direct Local USB / SD / BLE Offload' },
 ] as const;
 
 export default function ReferenceDevicesPage() {
@@ -58,6 +101,12 @@ export default function ReferenceDevicesPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'matrix' | 'gotchas'>('cards');
   const [appliedFeedback, setAppliedFeedback] = useState(false);
 
+  // Protocol Pressure-Test Console state
+  const [protocolConstraints, setProtocolConstraints] = useState<ProtocolConstraints>(
+    DEFAULT_PROTOCOL_CONSTRAINTS,
+  );
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
+
   // Noise & Sample Size Simulator Controls
   const [baseN, setBaseN] = useState<number>(() => study.n ?? 60);
   const [expectedDutSd, setExpectedDutSd] = useState<number>(() => study.measurementSd ?? 1.5);
@@ -70,6 +119,27 @@ export default function ReferenceDevicesPage() {
     [selectedDomainId, selectedTier],
   );
 
+  const hasActiveConstraints = useMemo(
+    () => Object.values(protocolConstraints).some((v) => v !== 'any'),
+    [protocolConstraints],
+  );
+
+  const deviceEvaluations = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof evaluateProtocolFit>>();
+    for (const dev of displayedDevices) {
+      map.set(dev.id, evaluateProtocolFit(dev, protocolConstraints));
+    }
+    return map;
+  }, [displayedDevices, protocolConstraints]);
+
+  const protocolConflictDiagnostic = useMemo(() => {
+    const evaluationsList = displayedDevices.map((device) => ({
+      device,
+      fit: deviceEvaluations.get(device.id) ?? evaluateProtocolFit(device, protocolConstraints),
+    }));
+    return diagnoseProtocolConflicts(selectedDomainId, protocolConstraints, evaluationsList);
+  }, [selectedDomainId, protocolConstraints, displayedDevices, deviceEvaluations]);
+
   // Switch domain handler with URL synchronization
   const handleDomainChange = (newDomainId: FeatureDomainId) => {
     setSelectedDomainId(newDomainId);
@@ -81,9 +151,24 @@ export default function ReferenceDevicesPage() {
     if (silver) {
       setSelectedRefDeviceId(silver.id);
       if (silver.measurementSd > 0) {
-        setExpectedDutSd(silver.measurementSd * 1.5);
+        setExpectedDutSd(Number((silver.measurementSd * 1.5).toFixed(2)));
       }
     }
+  };
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = STUDY_ARCHETYPE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setActivePresetId(preset.id);
+    setProtocolConstraints(preset.constraints);
+    if (preset.recommendedDomain && preset.recommendedDomain !== selectedDomainId) {
+      handleDomainChange(preset.recommendedDomain);
+    }
+  };
+
+  const handleResetConstraints = () => {
+    setActivePresetId(null);
+    setProtocolConstraints(DEFAULT_PROTOCOL_CONSTRAINTS);
   };
 
   // Active Reference Device for Noise Inflation calculation
@@ -151,13 +236,14 @@ export default function ReferenceDevicesPage() {
       eyebrow="PROTOCOL STUDIO • TOOL 00"
       accent="series-1"
       title="Which reference standard should I validate against?"
-      method="Reference Device Selection, Predicate Chain & Noise Allocation"
+      method="Reference Device Selection, Protocol Pressure-Testing & Noise Allocation"
       currentN={noiseImpact.adjustedN}
       intro={
         <p className="leading-relaxed">
-          Selecting a reference device dictates your regulatory clearance path, data pipeline friction,
-          synchronization architecture, and study consumables budget. Validating against a noisy silver or bronze
-          reference introduces reference error variance{' '}
+          Selecting a reference standard or clinical study wearable is governed by your hypothesis and protocol
+          constraints—granularity (continuous beat-to-beat IBI vs nocturnal HRV), sleep staging fidelity, wear horizon,
+          firmware stability, and API/contract walls. Validating against a noisy silver or bronze comparator also
+          introduces reference error variance{' '}
           <span className="font-mono text-ink font-semibold">σ²_REF</span>, which directly inflates the limits of
           agreement and requires a larger sample size{' '}
           <span className="font-mono text-ink font-semibold">n</span> to maintain statistical power.
@@ -173,7 +259,7 @@ export default function ReferenceDevicesPage() {
       }
       controls={
         <div className="space-y-6">
-          {/* Domain Selector with Quick Count & Search */}
+          {/* Domain Selector with Quick Count */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-ink-muted">
@@ -181,7 +267,7 @@ export default function ReferenceDevicesPage() {
               </span>
               <span className="text-[10px] text-ink-muted">{FEATURE_DOMAINS.length} Domains</span>
             </div>
-            <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-1 max-h-60 overflow-y-auto pr-1">
               {FEATURE_DOMAINS.map((f) => {
                 const isSelected = f.id === selectedDomainId;
                 return (
@@ -189,15 +275,15 @@ export default function ReferenceDevicesPage() {
                     key={f.id}
                     type="button"
                     onClick={() => handleDomainChange(f.id)}
-                    className={`flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs transition-all ${
+                    className={`flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs transition-all ${
                       isSelected
                         ? 'border border-series-1 bg-series-1/10 font-bold text-series-1 shadow-2xs'
                         : 'border border-hairline bg-surface text-ink hover:border-hairline-strong'
                     }`}
                   >
-                    <span className="truncate">{f.name}</span>
+                    <span className="leading-snug">{f.name}</span>
                     {f.isPriorityTop5 && (
-                      <span className="rounded-md bg-series-1/20 px-1.5 py-0.5 text-[9px] font-bold text-series-1 uppercase">
+                      <span className="shrink-0 rounded-md bg-series-1/20 px-1.5 py-0.5 text-[9px] font-bold text-series-1 uppercase">
                         Core 5
                       </span>
                     )}
@@ -306,7 +392,7 @@ export default function ReferenceDevicesPage() {
                     {noiseImpact.adjustedN}
                   </span>
                   {noiseImpact.penaltySubjects > 0 && (
-                    <span className="block text-[10px] text-amber-600 font-semibold">
+                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
                       (+{noiseImpact.penaltySubjects} subjects penalty)
                     </span>
                   )}
@@ -341,10 +427,10 @@ export default function ReferenceDevicesPage() {
           <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-bold text-ink flex items-center gap-1.5">
-                <DollarSign size={14} className="text-emerald-600" />
+                <DollarSign size={14} className="text-emerald-600 dark:text-emerald-400" />
                 Consumables Estimate
               </span>
-              <span className="font-mono font-extrabold text-emerald-600 text-sm">
+              <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
                 ${consumableBudget.totalConsumableCostUsd.toLocaleString()}
               </span>
             </div>
@@ -438,15 +524,152 @@ export default function ReferenceDevicesPage() {
           </div>
         </section>
 
+        {/* Protocol Pressure-Test Console */}
+        <section
+          aria-label="Protocol Pressure-Test Console"
+          className="rounded-2xl border border-hairline bg-surface p-5 sm:p-6 shadow-2xs space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <FlaskConical size={16} className="text-series-1" />
+                <h3 className="text-sm sm:text-base font-bold text-ink">
+                  Protocol Pressure-Test Console: Match Instrument to Study Hypotheses
+                </h3>
+              </div>
+              <p className="text-xs text-ink-secondary leading-relaxed">
+                Before choosing a device for data access convenience, pressure-test candidate instruments against the 5
+                foundational protocol questions that govern physiological validity, participant burden, and API walls.
+              </p>
+            </div>
+            {hasActiveConstraints && (
+              <button
+                type="button"
+                onClick={handleResetConstraints}
+                className="self-start sm:self-auto shrink-0 rounded-xl border border-hairline bg-plane px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:text-ink transition-colors"
+              >
+                Reset Protocol Filters
+              </button>
+            )}
+          </div>
+
+          {/* 4 Study Archetype Presets */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block">
+              Quick-Load Study Archetype Presets:
+            </span>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {STUDY_ARCHETYPE_PRESETS.map((preset) => {
+                const isPresetActive = activePresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset.id)}
+                    className={`rounded-xl border p-3 text-left transition-all space-y-1 ${
+                      isPresetActive
+                        ? 'border-series-1 bg-series-1/10 ring-1 ring-series-1/30'
+                        : 'border-hairline bg-plane hover:border-series-1/40'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-ink">{preset.shortLabel}</div>
+                    <p className="text-[11px] text-ink-secondary leading-relaxed">{preset.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 5 Foundational Protocol Constraints */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 pt-2 border-t border-hairline">
+            <SelectField
+              label="1. Endpoint Status"
+              value={protocolConstraints.endpointStatus}
+              options={ENDPOINT_STATUS_OPTIONS}
+              onChange={(val) => {
+                setActivePresetId(null);
+                setProtocolConstraints((prev) => ({
+                  ...prev,
+                  endpointStatus: val as ProtocolConstraints['endpointStatus'],
+                }));
+              }}
+            />
+            <SelectField
+              label="2. Sampling Window"
+              value={protocolConstraints.physiologicalConstruct}
+              options={PHYSIOLOGICAL_CONSTRUCT_OPTIONS}
+              onChange={(val) => {
+                setActivePresetId(null);
+                setProtocolConstraints((prev) => ({
+                  ...prev,
+                  physiologicalConstruct: val as ProtocolConstraints['physiologicalConstruct'],
+                }));
+              }}
+            />
+            <SelectField
+              label="3. Required Granularity"
+              value={protocolConstraints.requiredGranularity}
+              options={REQUIRED_GRANULARITY_OPTIONS}
+              onChange={(val) => {
+                setActivePresetId(null);
+                setProtocolConstraints((prev) => ({
+                  ...prev,
+                  requiredGranularity: val as ProtocolConstraints['requiredGranularity'],
+                }));
+              }}
+            />
+            <SelectField
+              label="4. Monitoring Cadence"
+              value={protocolConstraints.monitoringCadence}
+              options={MONITORING_CADENCE_OPTIONS}
+              onChange={(val) => {
+                setActivePresetId(null);
+                setProtocolConstraints((prev) => ({
+                  ...prev,
+                  monitoringCadence: val as ProtocolConstraints['monitoringCadence'],
+                }));
+              }}
+            />
+            <SelectField
+              label="5. Data Offload Model"
+              value={protocolConstraints.dataOffloadModel}
+              options={DATA_OFFLOAD_OPTIONS}
+              onChange={(val) => {
+                setActivePresetId(null);
+                setProtocolConstraints((prev) => ({
+                  ...prev,
+                  dataOffloadModel: val as ProtocolConstraints['dataOffloadModel'],
+                }));
+              }}
+            />
+          </div>
+
+          {/* Protocol Conflict Diagnostic Banner */}
+          {protocolConflictDiagnostic && protocolConflictDiagnostic.hasConflict && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
+                <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>{protocolConflictDiagnostic.title}</span>
+              </div>
+              <p className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
+                {protocolConflictDiagnostic.explanation}
+              </p>
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 leading-relaxed">
+                {protocolConflictDiagnostic.recommendedResolution}
+              </p>
+            </div>
+          )}
+        </section>
+
         {/* View Mode Toggle Header */}
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-bold text-ink">
-                Candidate Reference Standards ({displayedDevices.length} available)
+                Candidate Reference &amp; Study Instruments ({displayedDevices.length} available)
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                Inspect 10-dimension engineering profiles or compare specifications side-by-side.
+                Inspect 10-dimension engineering dossiers, study-fit guidance, or compare specifications side-by-side.
               </p>
             </div>
 
@@ -483,7 +706,7 @@ export default function ReferenceDevicesPage() {
                 onClick={() => setViewMode('gotchas')}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-colors ${
                   viewMode === 'gotchas'
-                    ? 'bg-surface font-bold text-amber-700 shadow-2xs'
+                    ? 'bg-surface font-bold text-amber-700 dark:text-amber-400 shadow-2xs'
                     : 'text-ink-muted hover:text-ink'
                 }`}
               >
@@ -499,12 +722,14 @@ export default function ReferenceDevicesPage() {
               {displayedDevices.map((device) => {
                 const tierBadgeClass =
                   device.tier === 'gold'
-                    ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
                     : device.tier === 'silver'
-                      ? 'bg-blue-500/10 text-blue-700 border-blue-500/30'
-                      : 'bg-orange-600/10 text-orange-700 border-orange-600/30';
+                      ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                      : 'bg-orange-600/10 text-orange-700 dark:text-orange-300 border-orange-600/30';
 
                 const isSelectedForNoise = selectedRefDeviceId === device.id;
+                const fitEval = deviceEvaluations.get(device.id);
+                const si = device.studyInstrument;
 
                 return (
                   <div
@@ -517,16 +742,47 @@ export default function ReferenceDevicesPage() {
                   >
                     <div className="space-y-3">
                       {/* Header Badges */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <span
                           className={`rounded-md border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${tierBadgeClass}`}
                         >
                           {device.tier} STANDARD
                         </span>
-                        <span className="font-mono text-[11px] text-ink-muted truncate max-w-[130px]">
+                        <span className="font-mono text-[11px] text-ink-muted">
                           {device.regulatory.clearancePathway}
                         </span>
                       </div>
+
+                      {/* Protocol Fit Badge when constraints are active */}
+                      {hasActiveConstraints && fitEval && (
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              fitEval.status === 'compatible'
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                : fitEval.status === 'conditional'
+                                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                  : 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                            }`}
+                          >
+                            {fitEval.status === 'compatible'
+                              ? '✓ Protocol Match'
+                              : fitEval.status === 'conditional'
+                                ? '⚠ Conditional Fit'
+                                : '✕ Protocol Mismatch'}
+                          </span>
+                          {fitEval.status === 'mismatch' && fitEval.reasons.length > 0 && (
+                            <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-snug">
+                              {fitEval.reasons[0]}
+                            </p>
+                          )}
+                          {fitEval.status === 'conditional' && fitEval.tradeoffs.length > 0 && (
+                            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+                              {fitEval.tradeoffs[0]}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Titles */}
                       <div>
@@ -536,9 +792,31 @@ export default function ReferenceDevicesPage() {
                         <p className="text-xs text-ink-muted">{device.vendor}</p>
                       </div>
 
-                      <p className="text-xs text-ink-secondary leading-relaxed line-clamp-2">
+                      <p className="text-xs text-ink-secondary leading-relaxed">
                         {device.tagline}
                       </p>
+
+                      {/* Study Instrument Quick Badges */}
+                      {si && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="rounded-md border border-hairline bg-plane px-2 py-0.5 text-[10px] font-semibold text-ink-secondary">
+                            {FORM_FACTOR_LABELS[si.formFactor]}
+                          </span>
+                          <span className="rounded-md border border-hairline bg-plane px-2 py-0.5 text-[10px] font-semibold text-ink-secondary">
+                            {DATA_GRANULARITY_LABELS[si.dataGranularity]}
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+                              si.firmwareLockSupported
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                            }`}
+                          >
+                            {si.firmwareLockSupported ? <Lock size={10} /> : <Unlock size={10} />}
+                            {si.firmwareLockSupported ? 'Firmware Lockable' : 'Uncontrolled OTA'}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Key Spec Badges */}
                       <div className="space-y-2 border-t border-hairline pt-3 text-xs">
@@ -554,7 +832,7 @@ export default function ReferenceDevicesPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-ink-muted flex items-center gap-1">
-                            <Cpu size={13} className="text-blue-600" /> Pipeline:
+                            <Cpu size={13} className="text-blue-600 dark:text-blue-400" /> Pipeline:
                           </span>
                           <span className="font-medium text-[11px] text-ink flex items-center gap-1">
                             <span className="font-mono font-bold text-series-1">{device.dataPipeline.easeScore}/5</span>
@@ -566,7 +844,7 @@ export default function ReferenceDevicesPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-ink-muted flex items-center gap-1">
-                            <Scale size={13} className="text-emerald-600" /> Noise Floor:
+                            <Scale size={13} className="text-emerald-600 dark:text-emerald-400" /> Noise Floor:
                           </span>
                           <span className="font-mono text-[11px] font-bold text-ink">
                             ± {device.measurementSd} {domain.primaryUnit}
@@ -575,7 +853,7 @@ export default function ReferenceDevicesPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-ink-muted flex items-center gap-1">
-                            <DollarSign size={13} className="text-amber-600" /> Consumable:
+                            <DollarSign size={13} className="text-amber-600 dark:text-amber-400" /> Consumable:
                           </span>
                           <span className="font-mono text-[11px] font-semibold text-ink">
                             ${device.economics.perSubjectConsumableCost.toFixed(2)} / pt
@@ -621,26 +899,56 @@ export default function ReferenceDevicesPage() {
                   <tr className="border-b border-hairline bg-plane/50 text-ink-muted">
                     <th className="p-3.5 font-bold uppercase tracking-wider text-[10px] w-48">Dimension</th>
                     {displayedDevices.map((d) => (
-                      <th key={d.id} className="p-3.5 font-bold text-ink min-w-[200px]">
-                        <div className="flex items-center gap-1.5">
+                      <th key={d.id} className="p-3.5 font-bold text-ink min-w-[210px]">
+                        <div className="flex flex-col gap-1">
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase ${
+                            className={`self-start rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase ${
                               d.tier === 'gold'
-                                ? 'bg-amber-500/10 text-amber-700'
+                                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                                 : d.tier === 'silver'
-                                  ? 'bg-blue-500/10 text-blue-700'
-                                  : 'bg-orange-600/10 text-orange-700'
+                                  ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                                  : 'bg-orange-600/10 text-orange-700 dark:text-orange-300'
                             }`}
                           >
                             {d.tier}
                           </span>
-                          <span className="truncate">{d.name}</span>
+                          <span className="leading-snug">{d.name}</span>
                         </div>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline text-ink-secondary">
+                  <tr>
+                    <td className="p-3.5 font-semibold text-ink bg-plane/20">Form Factor &amp; Battery</td>
+                    {displayedDevices.map((d) => (
+                      <td key={d.id} className="p-3.5 space-y-1">
+                        <div className="font-semibold text-ink">
+                          {d.studyInstrument ? FORM_FACTOR_LABELS[d.studyInstrument.formFactor] : 'Clinical Standard'}
+                        </div>
+                        <div className="text-[11px] text-ink-muted">
+                          {d.studyInstrument?.typicalBatteryLife ?? 'AC / Standard'}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr>
+                    <td className="p-3.5 font-semibold text-ink bg-plane/20">Data Granularity &amp; Lock</td>
+                    {displayedDevices.map((d) => (
+                      <td key={d.id} className="p-3.5 space-y-1">
+                        <div className="font-semibold text-ink">
+                          {d.studyInstrument ? DATA_GRANULARITY_LABELS[d.studyInstrument.dataGranularity] : 'Standard'}
+                        </div>
+                        <div className="text-[11px] text-ink-muted">
+                          {d.studyInstrument?.firmwareLockSupported
+                            ? '✓ Firmware Lockable'
+                            : '⚠ Uncontrolled Consumer OTA'}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+
                   <tr>
                     <td className="p-3.5 font-semibold text-ink bg-plane/20">Clearance &amp; Predicate</td>
                     {displayedDevices.map((d) => (
@@ -696,7 +1004,7 @@ export default function ReferenceDevicesPage() {
                     {displayedDevices.map((d) => (
                       <td key={d.id} className="p-3.5 space-y-1">
                         <div className="font-mono text-ink font-semibold">{d.economics.capexRange}</div>
-                        <div className="font-mono font-bold text-emerald-600">
+                        <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           ${d.economics.perSubjectConsumableCost.toFixed(2)} / subject
                         </div>
                       </td>
@@ -743,18 +1051,18 @@ export default function ReferenceDevicesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle size={16} className="text-amber-600" />
-                      <div className="text-sm font-bold text-amber-950">
+                      <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
+                      <div className="text-sm font-bold text-amber-950 dark:text-amber-200">
                         {device.name} ({device.tier.toUpperCase()} STANDARD)
                       </div>
                     </div>
-                    <span className="text-[11px] text-amber-900 font-semibold">{device.vendor}</span>
+                    <span className="text-[11px] text-amber-900 dark:text-amber-300 font-semibold">{device.vendor}</span>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 text-xs">
                     {device.fieldGotchas.map((gotcha, i) => (
                       <div key={i} className="rounded-xl border border-amber-500/20 bg-plane p-3 space-y-1">
-                        <span className="font-bold text-amber-800 text-[11px]">Field Pitfall #{i + 1}</span>
+                        <span className="font-bold text-amber-800 dark:text-amber-300 text-[11px]">Field Pitfall #{i + 1}</span>
                         <p className="text-ink leading-relaxed">{gotcha}</p>
                       </div>
                     ))}
@@ -769,18 +1077,18 @@ export default function ReferenceDevicesPage() {
         {viewMode !== 'gotchas' && (
           <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 sm:p-6 space-y-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle size={18} className="text-amber-600" />
-              <h4 className="text-sm font-bold text-amber-900">
+              <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400" />
+              <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
                 Hard-Won Clinical Protocol Lessons ({domain.name})
               </h4>
             </div>
-            <div className="text-xs font-semibold text-amber-800">
+            <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">
               Active Comparator: {selectedRefDevice?.name}
             </div>
-            <div className="grid gap-2 text-xs text-amber-950/90 leading-relaxed sm:grid-cols-2">
+            <div className="grid gap-2 text-xs text-amber-950/90 dark:text-amber-100 leading-relaxed sm:grid-cols-2">
               {selectedRefDevice?.fieldGotchas.map((gotcha, i) => (
                 <div key={i} className="rounded-xl border border-amber-500/20 bg-plane p-3 space-y-1">
-                  <span className="font-bold text-amber-800">Operational Trap #{i + 1}</span>
+                  <span className="font-bold text-amber-800 dark:text-amber-300">Operational Trap #{i + 1}</span>
                   <p>{gotcha}</p>
                 </div>
               ))}
@@ -810,18 +1118,23 @@ export default function ReferenceDevicesPage() {
         />
       </div>
 
-      {/* Full 10-Dimension Spec Sheet Modal */}
+      {/* Full Spec Sheet & Study Instrument Dossier Modal */}
       {activeDossierDevice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-3 sm:p-4 backdrop-blur-xs">
           <div className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-hairline bg-plane p-5 sm:p-8 shadow-2xl space-y-6">
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-hairline pb-4 sticky top-0 bg-plane z-10 pt-1">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-series-1/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-series-1">
                     {activeDossierDevice.tier.toUpperCase()} STANDARD
                   </span>
                   <span className="text-xs text-ink-muted">{activeDossierDevice.model}</span>
+                  {activeDossierDevice.studyInstrument && (
+                    <span className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
+                      Guidance Status: {activeDossierDevice.studyInstrument.reviewStatus}
+                    </span>
+                  )}
                 </div>
                 <h3 className="mt-1 text-xl sm:text-2xl font-extrabold text-ink">{activeDossierDevice.name}</h3>
                 <p className="text-xs text-ink-secondary mt-0.5">{activeDossierDevice.tagline}</p>
@@ -861,7 +1174,7 @@ export default function ReferenceDevicesPage() {
               </div>
             </div>
 
-            {/* 10-Dimension Grid */}
+            {/* Sections 1–4 Grid */}
             <div className="grid gap-5 md:grid-cols-2 text-xs">
               {/* 1. Regulatory & Predicate */}
               <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2">
@@ -912,7 +1225,7 @@ export default function ReferenceDevicesPage() {
               {/* 2. Data Pipeline */}
               <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2">
                 <h4 className="font-bold text-ink flex items-center gap-1.5">
-                  <Database size={14} className="text-blue-600" />
+                  <Database size={14} className="text-blue-600 dark:text-blue-400" />
                   2. Data Pipeline &amp; File Infrastructure
                 </h4>
                 <div className="space-y-1.5 text-ink-secondary">
@@ -971,7 +1284,7 @@ export default function ReferenceDevicesPage() {
               {/* 4. Economics & Operations */}
               <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2">
                 <h4 className="font-bold text-ink flex items-center gap-1.5">
-                  <DollarSign size={14} className="text-emerald-600" />
+                  <DollarSign size={14} className="text-emerald-600 dark:text-emerald-400" />
                   4. Economics, Consumables &amp; Lifecycle
                 </h4>
                 <div className="space-y-1.5 text-ink-secondary">
@@ -985,7 +1298,7 @@ export default function ReferenceDevicesPage() {
                   </p>
                   <div className="flex items-center justify-between">
                     <strong className="text-ink">Consumables per Subject:</strong>{' '}
-                    <span className="font-mono font-bold text-emerald-600">
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                       ${activeDossierDevice.economics.perSubjectConsumableCost.toFixed(2)}
                     </span>
                   </div>
@@ -994,7 +1307,7 @@ export default function ReferenceDevicesPage() {
                     {activeDossierDevice.economics.consumablesRequired.join(', ')}
                   </p>
                   {activeDossierDevice.economics.shelfLifeAlert && (
-                    <p className="rounded-lg bg-amber-500/10 p-2 text-[11px] font-semibold text-amber-700">
+                    <p className="rounded-lg bg-amber-500/10 p-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       ⚠️ {activeDossierDevice.economics.shelfLifeAlert}
                     </p>
                   )}
@@ -1018,10 +1331,143 @@ export default function ReferenceDevicesPage() {
               </div>
             </div>
 
+            {/* Section 5: Clinical Study Instrument Fit, API Walls & Cohort Sensitivities */}
+            {activeDossierDevice.studyInstrument && (
+              <div className="rounded-2xl border border-hairline bg-surface p-5 space-y-4 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
+                  <h4 className="font-bold text-ink flex items-center gap-1.5 text-sm">
+                    <FlaskConical size={15} className="text-series-1" />
+                    5. Clinical Study Instrument Fit, API Walls &amp; Cohort Sensitivities
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-hairline bg-plane px-2 py-0.5 font-mono text-[10px] text-ink-secondary">
+                      {FORM_FACTOR_LABELS[activeDossierDevice.studyInstrument.formFactor]}
+                    </span>
+                    <span className="rounded-md border border-hairline bg-plane px-2 py-0.5 font-mono text-[10px] text-ink-secondary">
+                      {DATA_GRANULARITY_LABELS[activeDossierDevice.studyInstrument.dataGranularity]}
+                    </span>
+                    <span className="rounded-md border border-hairline bg-plane px-2 py-0.5 font-mono text-[10px] text-ink-secondary">
+                      {OFFLOAD_MECHANISM_LABELS[activeDossierDevice.studyInstrument.offloadMechanism]}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <strong className="text-ink block">Granularity &amp; Signal Access Reality:</strong>
+                    <p className="text-ink-secondary leading-relaxed">
+                      {activeDossierDevice.studyInstrument.granularityDetails}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <strong className="text-ink block">
+                      Firmware &amp; Algorithm Stability (
+                      {activeDossierDevice.studyInstrument.firmwareLockSupported
+                        ? 'Version-Lock Supported'
+                        : 'Uncontrolled Consumer OTA'}
+                      ):
+                    </strong>
+                    <p className="text-ink-secondary leading-relaxed">
+                      {activeDossierDevice.studyInstrument.algorithmStabilityNotes}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Use For vs Do Not Use For */}
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5 space-y-1.5">
+                    <strong className="text-emerald-700 dark:text-emerald-300 block">
+                      ✓ Recommended Study Protocols (Use For):
+                    </strong>
+                    <ul className="list-disc pl-4 space-y-1 text-ink-secondary">
+                      {activeDossierDevice.studyInstrument.useFor.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3.5 space-y-1.5">
+                    <strong className="text-rose-700 dark:text-rose-300 block">
+                      ✕ Incompatible Study Protocols (Do Not Use For):
+                    </strong>
+                    <ul className="list-disc pl-4 space-y-1 text-ink-secondary">
+                      {activeDossierDevice.studyInstrument.doNotUseFor.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Contract Walls & Cohort Considerations */}
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="space-y-1.5">
+                    <strong className="text-ink block">Contract, Licensing &amp; Cost Walls:</strong>
+                    <ul className="list-disc pl-4 space-y-1 text-ink-secondary">
+                      {activeDossierDevice.studyInstrument.contractAndCostWalls.map((wall, i) => (
+                        <li key={i}>{wall}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="space-y-1.5">
+                    <strong className="text-ink block">Cohort-Specific Physiological Considerations:</strong>
+                    <ul className="list-disc pl-4 space-y-1 text-ink-secondary">
+                      <li>
+                        <strong className="text-ink">Aging &amp; Neurodegeneration:</strong>{' '}
+                        {activeDossierDevice.studyInstrument.cohortConsiderations.agingAndNeuro}
+                      </li>
+                      <li>
+                        <strong className="text-ink">Arrhythmia &amp; Ectopy:</strong>{' '}
+                        {activeDossierDevice.studyInstrument.cohortConsiderations.arrhythmiaAndEctopy}
+                      </li>
+                      <li>
+                        <strong className="text-ink">Skin Tone &amp; Perfusion:</strong>{' '}
+                        {activeDossierDevice.studyInstrument.cohortConsiderations.skinToneAndPerfusion}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Section 6: Published Validation Evidence & Provenance */}
+            {activeDossierDevice.studyInstrument && (
+              <div className="rounded-2xl border border-hairline bg-surface p-5 space-y-3 text-xs">
+                <h4 className="font-bold text-ink flex items-center gap-1.5 text-sm">
+                  <BookOpen size={15} className="text-series-1" />
+                  6. Published Validation Evidence &amp; Noise Floor Provenance
+                </h4>
+                <p className="text-ink-secondary">
+                  <strong className="text-ink">Reference SD Provenance (σ_REF = ± {activeDossierDevice.measurementSd} {domain.primaryUnit}):</strong>{' '}
+                  {activeDossierDevice.studyInstrument.measurementSdSource}
+                </p>
+                <div className="space-y-2 pt-1">
+                  {activeDossierDevice.studyInstrument.validationCitations.map((cit, i) => (
+                    <div key={i} className="rounded-xl border border-hairline bg-plane p-3 space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-ink">
+                          {cit.authors} ({cit.year}) — <em>{cit.journal}</em>
+                        </span>
+                        {cit.doiOrPmid && (
+                          <span className="font-mono text-[11px] text-series-1">{cit.doiOrPmid}</span>
+                        )}
+                      </div>
+                      <div className="text-ink font-medium">{cit.title}</div>
+                      <div className="text-[11px] text-ink-muted">
+                        <strong>Sample &amp; Protocol:</strong> {cit.sampleSize} • {cit.protocolContext}
+                      </div>
+                      <div className="text-[11px] text-ink-secondary">
+                        <strong>Key Finding:</strong> {cit.reportedResult}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Strengths & Limitations */}
             <div className="grid gap-4 sm:grid-cols-2 text-xs">
               <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2">
-                <span className="font-bold text-emerald-600 flex items-center gap-1">
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 size={14} /> Methodological Strengths
                 </span>
                 <ul className="list-disc pl-4 space-y-1 text-ink-secondary">
@@ -1032,7 +1478,7 @@ export default function ReferenceDevicesPage() {
               </div>
 
               <div className="rounded-2xl border border-hairline bg-surface p-4 space-y-2">
-                <span className="font-bold text-amber-600 flex items-center gap-1">
+                <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                   <AlertTriangle size={14} /> Operational Limitations
                 </span>
                 <ul className="list-disc pl-4 space-y-1 text-ink-secondary">

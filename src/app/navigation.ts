@@ -158,6 +158,24 @@ export const EXPLAINER_ROUTES: ModuleRoute[] = [
   },
 ];
 
+/**
+ * Cross-domain case studies live under `/academy/*` but are deliberately kept
+ * out of `ACADEMY_STUDIOS` and `MODULE_ROUTES`: they showcase the same agreekit
+ * maths on non-wearable data and must not read as part of Protocol Studio.
+ */
+export const CASE_STUDY_ROUTES: ModuleRoute[] = [
+  {
+    path: '/academy/astro-calval',
+    label: 'Astro Cal/Val',
+    title: 'Same math, different photons',
+    method: 'Clustered Bland–Altman, SRD TOST, σ_NMAD envelopes & paired Cliff’s delta',
+    blurb:
+      'The limits-of-agreement toolkit used to validate a PPG wearable against ECG, applied to Rubin LSST photometric redshifts against DESI spectroscopy: catastrophic outliers, faint-magnitude heteroscedasticity, repeated exposures, and an equivalence test against the LSST SRD bias requirement.',
+    status: 'ready',
+    inNav: false,
+  },
+];
+
 export interface PlatformPillar {
   id: string;
   number: number;
